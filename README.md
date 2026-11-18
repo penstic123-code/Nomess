@@ -97,7 +97,7 @@ jobs:
         with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - run: git clone --depth 1 --branch v0.9.0 https://github.com/penstic123-code/Nomess ../nomess-src
+      - run: git clone --depth 1 --branch v0.9.1 https://github.com/penstic123-code/Nomess ../nomess-src
       - env:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           LOOSEN: ${{ contains(github.event.pull_request.labels.*.name, 'nomess-loosen') && '--allow-loosen' || '' }}
