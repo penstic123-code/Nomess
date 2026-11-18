@@ -154,7 +154,7 @@
 
 | kind | 对象 | 存的事实 |
 |---|---|---|
-| `clones.tok.<家族>` | 源码文件 | 去注释和空白后的 token 数;两路 winnowing 指纹(平铺的 `[哈希低 32 位, 第几个 token, ...]`,不存行号,行号命中后重新分词得到):**精确**(原样 token)和**归一**(标识符换占位、字面量保留类型);指纹用固定的 K=25、窗口 W=26(保证长度 ≥50 的重复必有共同指纹) |
+| `clones.tok.<家族>` | 源码文件 | 去注释和空白后的 token 数;两路 winnowing 指纹(`[哈希低 32 位, 第几个 token, 哈希, 序号, ...]` 交替排成 32 位无符号小端数组、整体 base64 编成一个字符串存,用到时才解码;`{"n": token 数, "x": 精确, "m": 归一}`;不存行号,行号命中后重新分词得到):**精确**(原样 token)和**归一**(标识符换占位、字面量保留类型);指纹用固定的 K=25、窗口 W=26(保证长度 ≥50 的重复必有共同指纹) |
 | `clones.doc` | `docs/**/*.md` | 去掉生成段(用 `docgen` 现成的标记正则圈出)和代码块之后的 token 数和精确指纹,参数同上 |
 | `smells.<语言>` | 源码文件 | 非空行数;P2 每个标签的出现数;P5 用的"定义的标识符"表;`py`:函数 `[全名, 起, 止]`、except 块 `[行, 抓的类型("全部"/"具体"), 处理体("吞"/"别的")]`;`js`:空 catch 的行号;`excepts` 里还存抓的类型文本供提示 |
 
@@ -179,7 +179,7 @@
   - 不属于任何子系统的文件不参与任何约束。`arch` 段写错(子系统名不存在、`表.列` 不存在、同列两条 `single_writer`、形状或多余的键)抛 `ValueError` 退出 2。
 - **归属**:`map.owners_of(systems, 文件)` 是唯一入口(系统图和 `arch` 共用);一个文件匹配两个子系统 -> 退出 2 并报出文件。没填 `systems` 按源文件所在的顶层目录划。
 - **生成器 `owners`**(`builtin: owners`):从 `single_writer` 出归属图的主人表,按 `表.列` 排序。
-- **缓存事实**:`deps.<语言>`(`deps.VERSION`)= 每个文件还没解析的 import(Python `[点数, 模块, 名字, 行]`;JS / C / Go 字符串和行;Rust `mod` / `use`;C# 声明的命名空间和 `using`);`map.table`(version = 表名@表配置 sha1)= 每个文件的正则命中(各捕获组去首尾空白)。import 落到哪个文件(边)、子系统归属、行属于谁,每次现算。
+- **缓存事实**:`deps.<语言>`(`deps.VERSION`)= 每个文件还没解析的 import(Python `[点数, 模块, 名字, 行]`;JS / C / Go 字符串和行;Rust `mod` / `use`;C# 声明的命名空间和 `using`);`deps.header.py` / `deps.header.other`(`deps.VERSION`)= `[头注释第一句 | null, 文件是否为空]`(系统图文件清单和 HDR 用);`map.table`(version = 表名@表配置 sha1)= 每个文件的正则命中(各捕获组去首尾空白)。import 落到哪个文件(边)、子系统归属(`owners_of` 按 glob 的字面首段分桶再匹配)、行属于谁,每次现算。
 - **依赖图**:`deps.edges(snap, files)` 返回 `{(源, 被依赖): 行}`。`EXT_LANG` 名字和结构不变。
 - **系统图**:`size` 为 `small` 时只出 `index.md`(不带分页链接,热点行不链分页);`files.md`、`deps.md` 超 `map.page_tokens` 时 `files.md` 收成每个目录一行(文件数)、`deps.md` 只列跨子系统的边;依赖热点阈值读 `smells.fan_in`;热点清单末行"屎山存量 N"(`check.load_baseline` 的条目数);和已有页的比较走 `docgen.same`。
 <!-- <<< P24 -->

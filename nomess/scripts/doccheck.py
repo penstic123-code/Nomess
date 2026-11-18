@@ -66,7 +66,7 @@ def broken_links(snap):
 
 def missing_headers(snap):
     return [F("yellow", "HDR", f, 1, "no header", t("HDR"))
-            for f in deps.tracked(snap) if snap.read(f) and deps.header(snap, f) is None]
+            for f in deps.tracked(snap) if deps.missing_header(snap, f)]
 
 
 def unverified(snap, cfg):

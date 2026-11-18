@@ -1,6 +1,6 @@
 """内置文件清单与依赖(给 nomess map / check 用)。文件清单取 git 已跟踪加未忽略的新文件,天然排除生成物;
 依赖只留仓库内部的,按扩展名认语言:Python / JS·TS / C·C++ / Go / Rust / C#。Python 用 ast,其余正则级(注释、字符串里的也会算)。
-每个文件的原始 import 经 cache.facts 缓存;落到哪个文件(边)每次现算。"""
+每个文件的原始 import 和头注释第一句经 cache.facts 缓存;落到哪个文件(边)每次现算。"""
 import ast
 import os
 import posixpath
@@ -14,6 +14,7 @@ EXT_LANG = {".py": "py", ".js": "js", ".jsx": "js", ".mjs": "js", ".ts": "js", "
             ".c": "c", ".h": "c", ".cc": "c", ".cpp": "c", ".hpp": "c", ".cxx": "c",
             ".go": "go", ".rs": "rs", ".cs": "cs"}
 JS_EXT = (".ts", ".tsx", ".js", ".jsx", ".mjs")
+VERSION = "1"  # 缓存事实(import、头注释)的提取写法版本,改了就加一
 
 
 def all_files(snap):
@@ -38,14 +39,30 @@ def _sentence(s):
     return s[:80].strip()
 
 
+def _head(snap, rel):
+    """[头注释第一句 | None, 文件是否为空];经 cache.facts 缓存(kind deps.header.py / deps.header.other,头注释写法看是不是 .py)。"""
+    py = rel.endswith(".py")
+    return cache.facts(snap, rel, "deps.header." + ("py" if py else "other"), VERSION, lambda text: [_header(text, py), text == ""])
+
+
 def header(snap, rel):
     """头注释第一句;没有返回 None。"""
-    raw = snap.text(rel)[:2048].lstrip("\ufeff").split("\n")
+    return _head(snap, rel)[0]
+
+
+def missing_header(snap, rel):
+    """非空文件没有头注释(HDR 用)。"""
+    h, empty = _head(snap, rel)
+    return h is None and not empty
+
+
+def _header(text, py):
+    raw = text[:2048].lstrip("\ufeff").split("\n")
     lines = [l.strip() for l in raw if l.strip() and not l.startswith("#!") and not re.match(r"#.*coding[:=]", l)]
     if not lines:
         return None
     first = lines[0]
-    if rel.endswith(".py"):
+    if py:
         for q in ('"""', "'''"):
             if first.startswith(q):
                 rest = first[3:].replace(q, "")
@@ -62,9 +79,7 @@ def header(snap, rel):
 
 
 # ---------------------------------------------------------------- 原始事实:每个文件里还没解析的 import(单文件可得,经 cache.facts 缓存)
-# 键里的 kind 带语言(deps.<语言>),VERSION 改了提取写法就加一。落到哪个文件(边)要看整棵树,每次现算、不进缓存。
-
-VERSION = "1"
+# 键里的 kind 带语言(deps.<语言>),VERSION 改了提取写法就加一(头注释的 deps.header.* 也用它)。落到哪个文件(边)要看整棵树,每次现算、不进缓存。
 
 
 def _line(text, pos):

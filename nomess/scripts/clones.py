@@ -66,11 +66,6 @@ _TOKEN = {fam: re.compile(r"(%s)|(%s)|(%s)|(%s)|\S" % (com, st, _NUM, _ID)) for 
 _NORM = {2: "$S", 3: "$N"}
 
 
-def source_exts(eff):
-    """只看顶层配置的源码扩展名(smells.py 还在用;它改用 is_source 后删掉)。"""
-    return set(deps.EXT_LANG) | set(eff.cfg["smells"]["extra_ext"])
-
-
 def is_source(eff, path):
     """path 算源码:扩展名在 deps.EXT_LANG 里,或在这个文件自己的有效配置 smells.extra_ext 里(目录级 scope 可以加)。"""
     ext = os.path.splitext(path)[1]

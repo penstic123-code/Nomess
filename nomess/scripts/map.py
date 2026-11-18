@@ -68,10 +68,16 @@ def systems_of(cfg, names):
 def owners_of(systems, names):
     """{文件: 子系统名}(不属于任何子系统的不列);glob 语义同规则文件。一个文件匹配两个子系统 -> ValueError(配置错误,报出文件)。
     子系统归属的唯一入口:系统图和 arch 都用它。"""
-    items = [(name, pathglob.matcher(globs)) for name, globs in systems.items()]
+    # 按 glob 的首段分桶:首段是字面量的只试首段相同的文件,其余每个文件都试;免得 文件数 × glob 数 全量匹配
+    order = {name: i for i, name in enumerate(systems)}
+    by_top, anywhere = {}, []
+    for name, globs in systems.items():
+        for g in globs:
+            top = pathglob.literal_top(g)
+            (anywhere if top is None else by_top.setdefault(top, [])).append((name, pathglob.compile(g)))
     out = {}
     for f in names:
-        hit = [name for name, m in items if m(f)]
+        hit = sorted({name for name, rx in by_top.get(f.split("/")[0], []) + anywhere if rx.match(f)}, key=order.get)
         if len(hit) > 1:
             raise ValueError(t("MP_OVERLAP", f, hit[0], hit[1]))
         if hit:

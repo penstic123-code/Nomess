@@ -276,11 +276,13 @@ def observe(cand, cfg, eff, specs, mods, changes, only, gate, exec_cmd):
     def may_be_red(rid, level):
         return level == "red" or any(sc.get("level", {}).get(rid) == "red" for sc in eff.cfg["scopes"])
     raw, ran = [], set()
-    cmd_ok = exec_cmd and not (gate and _worktree_dirty(cand.root))
+    cmd_ok = None  # 第一条要跑的 cmd 规则才去问 git(没有 cmd 规则就不起这个子进程)
     skipped = []
     for r in eff.cfg["check"]["rules"]:
         if gate and not may_be_red(r["id"], r["level"]) or "cmd" in r and not exec_cmd:
             continue
+        if "cmd" in r and cmd_ok is None:
+            cmd_ok = not (gate and _worktree_dirty(cand.root))
         if "cmd" in r and not cmd_ok:
             skipped.append(r["id"])
             continue

@@ -2,6 +2,16 @@
 
 Versions follow [Semantic Versioning](https://semver.org/). Each release has three parts: Added, Changed, Fixed; breaking changes come first, with migration steps.
 
+## 0.9.2 – 2026-11-18
+
+### Added
+
+- README in bullet notes with 16 hand-drawn concept diagrams (rough.js; English and Simplified Chinese); hand-drawn quokka logo.
+
+### Changed
+
+- Faster commit check: file header facts are cached and shared by the system map and the header check; subsystem ownership matches each file only against globs with the same top directory; one `git check-attr` call per commit; `git diff --quiet` runs only when a `cmd` rule needs it.
+
 ## 0.9.1 – 2026-11-18
 
 ### Added

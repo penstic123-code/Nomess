@@ -137,6 +137,13 @@ def compile(g):
     return re.compile("(?:%s)\\Z" % "|".join(_one(x) for x in expand(g.strip())))
 
 
+def literal_top(g):
+    """glob g 能匹配的路径的首段(字面量,花括号展开后各项一致才算);不定(不带斜杠的任意层、首段有通配或转义)返回 None。按首段分桶匹配用。"""
+    tops = {x.lstrip("/").split("/")[0] if "/" in x else None for x in expand(g.strip())}
+    top = tops.pop() if len(tops) == 1 else None
+    return None if top is None or re.search(r"[*?\[\\]", top) else top
+
+
 def check(g):
     """不支持就 ValueError,支持就返回 None(只校验)。"""
     compile(g)

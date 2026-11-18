@@ -88,22 +88,31 @@ def main_refresh(argv):
 
 # ---------------------------------------------------------------- 钩子
 
-def _skip_reason(root, idx, rel):
-    """生成物 rel 不能安全改写的原因(None = 可以):设了 working-tree-encoding / filter(宿主和输出目录都查);
+def _skip_reasons(root, idx, rels):
+    """{生成物: 不能安全改写的原因},可以改写的不列:设了 working-tree-encoding / filter(宿主和输出目录都查,一次 check-attr --stdin);
     宿主文件另查:不是普通文件、工作区内容和索引不一致(hash-object --path 套用该路径的换行和过滤规则再比 oid,
     autocrlf 下干净的 CRLF 文件不算改动;不依赖 assume-unchanged)。"""
-    _, out, _ = _git(root, "check-attr", "working-tree-encoding", "filter", "--", rel)
-    if any(not l.endswith((": unspecified", ": unset")) for l in out.splitlines()):
-        return t("GH_SKIP_ATTR")
-    if rel.startswith(GEN_DIRS):
-        return None
-    if idx.files().get(rel) not in snapshot.REGULAR:
-        return t("GH_SKIP_NOTREG")
-    work = subprocess.run(["git", "hash-object", "--path=" + rel, "--", os.path.join(root, rel)], cwd=root, capture_output=True, text=True)
-    index = subprocess.run(["git", "hash-object", "--no-filters", "--stdin"], cwd=root, input=idx.read(rel), capture_output=True, text=False)
-    if work.returncode or work.stdout.strip() != index.stdout.decode().strip():
-        return t("GH_SKIP_DIRTY")
-    return None
+    if not rels:
+        return {}
+    p = subprocess.run(["git", "check-attr", "-z", "--stdin", "working-tree-encoding", "filter"], cwd=root, capture_output=True,
+                       input="".join(r + "\0" for r in rels).encode("utf-8", "surrogateescape"))
+    tok = p.stdout.split(b"\0")
+    blocked = {tok[i].decode("utf-8", "surrogateescape") for i in range(0, len(tok) - 2, 3) if tok[i + 2] not in (b"unspecified", b"unset")}
+    out = {}
+    for rel in rels:
+        if rel in blocked:
+            out[rel] = t("GH_SKIP_ATTR")
+            continue
+        if rel.startswith(GEN_DIRS):
+            continue
+        if idx.files().get(rel) not in snapshot.REGULAR:
+            out[rel] = t("GH_SKIP_NOTREG")
+            continue
+        work = subprocess.run(["git", "hash-object", "--path=" + rel, "--", os.path.join(root, rel)], cwd=root, capture_output=True, text=True)
+        index = subprocess.run(["git", "hash-object", "--no-filters", "--stdin"], cwd=root, input=idx.read(rel), capture_output=True, text=False)
+        if work.returncode or work.stdout.strip() != index.stdout.decode().strip():
+            out[rel] = t("GH_SKIP_DIRTY")
+    return out
 
 
 def _refreshes(root, name, cfg, idx):
@@ -143,11 +152,10 @@ def _gate(root, name, hsnap):
         snap, notes, changes = idx, [], {}
         if _refreshes(root, name, cfg, idx):
             changes = plan(idx, cfg, False)
-            for rel in [r for r, data in changes.items() if data is not None]:
-                why = _skip_reason(root, idx, rel)
-                if why:
-                    del changes[rel]
-                    notes.append(t("GH_SKIPPED", rel, why))
+            skip = _skip_reasons(root, idx, [r for r, data in changes.items() if data is not None])
+            for rel in [r for r in changes if r in skip]:
+                del changes[rel]
+                notes.append(t("GH_SKIPPED", rel, skip[rel]))
             if changes:
                 snap = idx.overlay(changes)
         res = check.evaluate(snap, hsnap, exec_cmd=True, gate=True)  # 有效配置和 HEAD 不同时它自己全树重判
@@ -155,11 +163,11 @@ def _gate(root, name, hsnap):
         notes += [f["msg"] for f in res["findings"] if f["rule"] == "CMD1"]
         index_only = {}
         if res["writes"] and not reds:  # 基线跟着改名走:和生成物同一条路写进这次提交
+            skip = _skip_reasons(root, idx, list(res["writes"]))
             for rel, data in res["writes"].items():
-                why = _skip_reason(root, idx, rel)  # 工作区有未暂存编辑或设了过滤 / 编码:只写索引,不碰工作区那份
-                if why:
+                if rel in skip:  # 工作区有未暂存编辑或设了过滤 / 编码:只写索引,不碰工作区那份
                     index_only[rel] = data
-                    notes.append(t("GH_BASE_INDEX", rel, why))
+                    notes.append(t("GH_BASE_INDEX", rel, skip[rel]))
                 else:
                     changes[rel] = data
             snap = snap.overlay(res["writes"])

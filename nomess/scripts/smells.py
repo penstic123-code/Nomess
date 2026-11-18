@@ -163,8 +163,7 @@ def run(snap, changes, eff):
             continue
         if "P5" in on and _file_p5(p):
             out.append(nm_config.F("yellow", "P5", p, 0, p, t("SM_P5_FILE"), k=["@file"]))
-        ext = os.path.splitext(p)[1]
-        if ext not in deps.EXT_LANG and ext not in e["smells"]["extra_ext"]:  # 扩展名资格按这个文件的有效配置判
+        if not clones.is_source(eff, p):  # 扩展名资格按这个文件的有效配置判
             continue
         lg = lang(p)
         f = cache.facts(snap, p, "smells." + lg, ANALYZER, lambda s, lg=lg: _facts(s, lg))
