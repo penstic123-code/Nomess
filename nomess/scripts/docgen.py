@@ -1,10 +1,8 @@
 """文档生成段:把文件里 <!-- GEN:<名字> BEGIN --> 与 <!-- GEN:<名字> END --> 之间的内容交给登记的生成器重写。
 标记之间只能由生成器写,手改会被下一次生成盖掉;标记之外是手写的,不动。一段的两个标记各占一行,同名标记在一个文件里只许一对。
 加一个生成段 = 在目标文件里放一对标记 + 在 nomess.json 的 "docgen" 段加一行。
-生成器四选一:map(抽取表名)、cmd(标准输出即正文,须输出 UTF-8,超时缺省 60 秒)、py("文件:函数")、builtin(见 builtin.py)。
+生成器三选一:map(抽取表名)、cmd(标准输出即正文,须输出 UTF-8,超时缺省 60 秒)、builtin(见 builtin.py)。
 """
-import contextlib
-import importlib.util
 import os
 import re
 import subprocess
@@ -65,33 +63,18 @@ def replace_section(text, name, body, path):
     return text[:a] + new + text[b:]
 
 
-def _load_py(base, ref):
-    path, _, func = ref.partition(":")
-    path = os.path.normpath(os.path.join(base, path))
-    mod_name = os.path.splitext(os.path.basename(path))[0]
-    mod = sys.modules.get(mod_name)
-    if mod is None or os.path.normcase(os.path.abspath(getattr(mod, "__file__", ""))) != os.path.normcase(path):
-        sys.path.insert(0, os.path.dirname(path))
-        spec = importlib.util.spec_from_file_location(mod_name, path)
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules[mod_name] = mod
-        spec.loader.exec_module(mod)
-    return getattr(mod, func)
-
-
 def sections_of(cfg):
     secs = cfg.get("docgen", {})
     for name, spec in secs.items():
-        if "file" not in spec or sum(k in spec for k in ("py", "cmd", "map", "builtin")) != 1:
+        if "py" in spec:
+            raise ValueError(t("GEN_PY", name))
+        if "file" not in spec or sum(k in spec for k in ("cmd", "map", "builtin")) != 1:
             raise ValueError(t("GEN_SPEC", name))
     return secs
 
 
 def produce(snap, cfg, spec):
-    base = snap.root  # cmd / py 生成器在工作区里跑、读磁盘(不走快照)
-    if "py" in spec:
-        with contextlib.redirect_stdout(sys.stderr):  # 正文是返回值;生成器顺手 print 的不能混进 stdout(--json 模式 stdout 只许有 JSON)
-            return _load_py(base, spec["py"])()
+    base = snap.root  # cmd 生成器在工作区里跑、读磁盘(不走快照)
     if "map" in spec:
         import map as nm_map
         return nm_map.generate(snap, cfg, spec["map"])
@@ -109,7 +92,7 @@ def produce(snap, cfg, spec):
 
 def run(snap, cfg, names=None, exec_=True):
     """按快照算生成段:返回 (过时的 [(名字, 文件)], {文件: 换好段的完整新内容 bytes})。不写盘。
-    exec_ 为假时跳过 cmd / py 生成器(它们会执行项目代码)。"""
+    exec_ 为假时跳过 cmd 生成器(它们会执行项目代码)。"""
     import builtin
     sections = sections_of(cfg)
     bad = [n for n in names or [] if n not in sections]
@@ -117,7 +100,7 @@ def run(snap, cfg, names=None, exec_=True):
         raise KeyError(t("GEN_UNKNOWN", ", ".join(bad), ", ".join(sections)))
     stale, puts = [], {}
     for name in names or sections:
-        if not exec_ and ("cmd" in sections[name] or "py" in sections[name]):
+        if not exec_ and "cmd" in sections[name]:
             continue
         spec = sections[name]
         if "builtin" in spec and spec["builtin"] not in builtin.GENERATORS:

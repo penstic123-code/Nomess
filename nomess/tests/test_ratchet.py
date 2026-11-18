@@ -226,16 +226,6 @@ def t_gate_cmd_dirty(tmp):
     expect(not by(res, "C1") and [f["level"] for f in by(res, "CMD1")] == ["yellow"], "有未暂存改动:C1 不跑,CMD1 黄")
 
 
-def t_gate_scope_red(tmp):
-    """审查 9:顶层黄的 forbid 被 scope 在 src/** 升红,钩子也要跑它并挡住。"""
-    rule = dict(RULE, level="yellow")
-    root = mkrepo(tmp, "gatered", {"lang": "en", "check": {"rules": [rule]},
-                                   "scopes": [{"paths": ["src/**"], "level": {"R1": "red"}, "why": "w"}]}, [("src/a.py", "ok\n")])
-    commit(root)
-    put(root, "src/a.py", "BAD\n")
-    expect([f["level"] for f in by(gate(root), "R1")] == ["red"], "scope 升红的 R1 在钩子里报红")
-
-
 def main():
     tmp = tempfile.mkdtemp(prefix="nomess-ratchet-")
     sys.path.insert(0, tmp)  # 假检测器写在这里

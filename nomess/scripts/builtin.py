@@ -43,7 +43,7 @@ def agents_entry(snap, cfg, spec):
     """入口段:固定三行;大项目(有 docs/schedule.md)多一行会话协议;inbox 攒到 lessons_remind 条多一行提醒整理。升降档建议不进入口段(只在 status 和状态栏)。"""
     import lessons
     exp = nm_config.expanded(cfg)
-    out = [t("ENTRY_1"), t("ENTRY_2"), t("ENTRY_3")]
+    out = [t("ENTRY_1" if snap.isfile("docs/overview.md") else "ENTRY_1B"), t("ENTRY_2"), t("ENTRY_3")]  # 总览页按需建,有才提
     if snap.isfile("docs/schedule.md"):
         out.append(t("ENTRY_4"))
     text = snap.text("%s/%s" % (exp["lessons_dir"], lessons.INBOX))

@@ -1,6 +1,8 @@
 # nomess 脚本
 
-`nomess <check|docgen|map|rules|lessons|status|doctor> [参数]`(`bin/nomess`、`bin/nomess.cmd`,或 `python scripts/nomess.py`)。只用标准库;过了不出声;从当前目录往上找 `nomess.json`,路径都相对它。退出码:0 通过,1 有新红项或过时,2 运行故障(配置不对、超时、生成器失败)。`map` 的文件清单和依赖靠 `git ls-files`,项目要在 git 仓库里。
+日常只用 `nomess refresh`(生成段、系统图、路径规则一次写完);`docgen`、`map`、`rules` 用来单独刷新某一项,各自带 `--check` 只比对不写(`refresh` 没有 `--check`)。
+
+`nomess <check|refresh|docgen|map|rules|lessons|status|doctor> [参数]`(`bin/nomess`、`bin/nomess.cmd`,或 `python scripts/nomess.py`)。只用标准库;过了不出声;从当前目录往上找 `nomess.json`,路径都相对它。退出码:0 通过,1 有新红项或过时,2 运行故障(配置不对、超时、生成器失败)。`map` 的文件清单和依赖靠 `git ls-files`,项目要在 git 仓库里。
 
 ## nomess.json
 
@@ -33,26 +35,26 @@
 | `lang` | `en`(缺省)或 `zh-CN`:脚本提示语的语言、`lessons add` 写出的字段名和状态词、生成文件里的固定文字。别的值报错(退出 2) | 全部子命令 |
 | `size` | `small`(缺省)/ `medium` / `large`:决定 `check.builtin`、`review.level` 的缺省值 | `nomess check`、init |
 | `check.rules` / `check.baseline` / `check.builtin` | 检查规则;基线文件(`nomess-baseline/2`);要开的内置检测号(缺省跟 `size`) | `nomess check` |
-| `smells` / `scopes` / `allow` / `arch` / `suggest` | 阈值;按目录覆盖;唯一的例外家;子系统间约束;升降档建议。全部键和缺省值见 `nm_config.DEFAULTS` 和下面"检测器和模块" | `nomess check` 等 |
-| `docgen` | 生成段名 → `{file, map / cmd / py / builtin 四选一}` | `nomess docgen` |
+| `smells` / `scopes` / `allow` / `arch` | 阈值;按目录覆盖;唯一的例外家;子系统间约束。全部键和缺省值见 `nm_config.DEFAULTS` 和下面"检测器和模块" | `nomess check` 等 |
+| `docgen` | 生成段名 → `{file, map / cmd / builtin 三选一}` | `nomess docgen` |
 | `map` | 抽取表:title、columns、glob、regex、file_col、misses、可选 `hotspot: {by, max, label}`;另有 `index_tokens`(整数,系统图首页预算,缺省 1500)、`page_tokens`(整数,`files.md`/`deps.md` 单页预算,缺省 8000),都不是表 | `nomess map` |
 | `systems` | 子系统名 → 非空的路径 glob 列表(glob 语义同规则文件,见 rules);没填就按源文件所在的顶层目录划(隐藏目录、只有文档的目录不算) | `nomess map`、`nomess rules`、说明页检查 |
 | `memory` | 预算覆盖(见下) | `nomess check --memory` |
 | `rules.file_tokens` | 每份规则文件的预算(估算 token),缺省 400 | `nomess rules`、check |
 | `review.level` | `off` / `light` / `standard` / `strict`(`off` 完全不审),缺省跟 `size`,别的值报错 | workflow、`/nomess:review` |
-| `review.cmd` | 外部审查命令(列表) | `/nomess:review` |
+| `review.cmd` | 外部审查命令(列表) | `nomess review-input --cmd` |
 | `lessons_dir` | 缺省 `docs/lessons` | `nomess lessons` |
 
-- **docgen**:文档里放 `<!-- GEN:名字 BEGIN -->` / `<!-- GEN:名字 END -->` 各占一行;标记之外的字节不动(CRLF 文件保持 CRLF)。生成器:`map`(抽取表名)、`cmd`(列表;标准输出即正文,**须输出 UTF-8**,Python 子进程自动设好;缺省超时 60 秒,可写 `timeout`)、`py`(`"文件:函数"`,返回字符串)、`builtin`:`lessons-index`(教训库每个主题页一行,每个主题页的条数)、`memory-index`(另写 `"dir"`:记忆目录,每个主题页一行)、`agents-entry`(`AGENTS.md` 的 nomess 段,固定 3 行:设计总览和系统图首页在哪、提交前自动检查、教训怎么查;有 `docs/schedule.md` 的大项目多 1 行会话协议;inbox 攒到 `lessons_remind` 条多 1 行提醒整理)。`nomess docgen [--check] [名字]`,内容没变不写文件。
+- **docgen**:文档里放 `<!-- GEN:名字 BEGIN -->` / `<!-- GEN:名字 END -->` 各占一行;标记之外的字节不动(CRLF 文件保持 CRLF)。生成器:`map`(抽取表名)、`cmd`(列表;标准输出即正文,**须输出 UTF-8**,Python 子进程自动设好;缺省超时 60 秒,可写 `timeout`)、`builtin`:`lessons-index`(教训库每个主题页一行,每个主题页的条数)、`memory-index`(另写 `"dir"`:记忆目录,每个主题页一行)、`agents-entry`(`AGENTS.md` 的 nomess 段,固定 3 行:设计总览和系统图首页在哪、提交前自动检查、教训怎么查;有 `docs/schedule.md` 的大项目多 1 行会话协议;inbox 攒到 `lessons_remind` 条多 1 行提醒整理)。`nomess docgen [--check] [名字]`,内容没变不写文件。
 - **map**:`nomess map [--check]` 写 `docs/system-map/`:`index.md`(分页链接、重叠热点清单加末行“屎山存量 N”(已冻结的检查发现数)、子系统一行一条、子系统依赖 Mermaid 图)、`files.md`(`git ls-files` 加头注释第一句)、`deps.md`(仓库内文件依赖,按扩展名认 Python / JS·TS / C·C++ / Go / Rust / C#)、每张抽取表一页;`size` 为 `small` 时只出首页(不带分页链接);`files.md`、`deps.md` 超 `map.page_tokens` 时,`files.md` 收成每个目录一行(文件数),`deps.md` 只列跨子系统的边。全部生成、不手改;`--check` 只比对。**首页有 token 预算**(`map.index_tokens`,缺省 1500):超了按固定顺序裁,先把子系统依赖图收成只留参与跨子系统依赖的节点(图本来就只画跨子系统的边),再把热点清单只留最重的 10 条(按涉及文件数,同数按文字)并写“其余 N 条见分页”;同样输入输出一字不差。裁完仍超预算,check 报黄 MAP1。没填 `systems` 时按源文件所在的顶层目录划子系统。抽取表每个正则捕获组一列(没匹配到的可选组为空)、每处匹配一行;`hotspot` 按 `by` 列分组,不同文件数超过 `max` 进热点清单(需 `file_col`);依赖里被超过 `smells.fan_in` 个文件依赖的文件也进热点。表名不能叫 index / files / deps。
-- **check**:`forbid` 匹配的行报,`require` 匹配不到的文件报,`cmd` 非零退出报;例外只写顶层 `allow`(见下节);`glob` 和 `allow.file` 的语义同 rules(pathglob.py,支持 `{a,b}`;`*.py` 不带 `/` 匹配任意层),只在 git 管着的文件(`git ls-files -co --exclude-standard`)里匹配,`map` 抽取表的 `glob` 也一样;红退出码 1,黄只显示。基线、`--freeze` / `--tighten` / `--ci` 见下节"检测器和模块";`--red` 是钩子跑的那一套、只列红项;`--rules` 列规则;`--all` 不截断(缺省最多 5 行,存量只计数)并逐条列存量;`--json` 输出数组,每项 `level`(red / yellow)、`rule`、`file`、`line`、`msg`、`state`、`frozen`;`--no-exec` 不运行项目里的任何代码(跳过 `cmd` 规则和 cmd / py 生成器,做梦出提案用)。`--red` 也查红 L5。内置检查不用登记:生成段和系统图过时(黄 GEN)、docs 断链(红 DOC1)、系统说明页缺 `这是什么：` / `为什么要有：` / `和谁配合：` 三行头(黄 DOC3)、新文件缺头注释(黄 HDR,缺省关,`check.builtin` 写了才开)、未核实教训条数(黄 L1)、inbox 结构坏了(红 L5)、标题几乎相同(黄 L4)、规则文件(见 rules)、方案头、`AGENTS.md`、系统图首页预算。
+- **check**:`forbid` 匹配的行报,`require` 匹配不到的文件报,`cmd` 非零退出报;例外只写顶层 `allow`(见下节);`glob` 和 `allow.file` 的语义同 rules(pathglob.py,支持 `{a,b}`;`*.py` 不带 `/` 匹配任意层),只在 git 管着的文件(`git ls-files -co --exclude-standard`)里匹配,`map` 抽取表的 `glob` 也一样;红退出码 1,黄只显示。基线、`--freeze` / `--tighten` / `--ci` 见下节"检测器和模块";`--red` 是钩子跑的那一套、只列红项;`--rules` 列规则;`--all` 不截断(缺省最多 5 行,存量只计数)并逐条列存量;`--json` 输出数组,每项 `level`(red / yellow)、`rule`、`file`、`line`、`msg`、`state`、`frozen`;`--no-exec` 不运行项目里的任何代码(跳过 `cmd` 规则和 cmd 生成器,做梦出提案用)。`--red` 也查红 L5。内置检查不用登记:生成段和系统图过时(黄 GEN)、docs 断链(红 DOC1)、系统说明页缺 `这是什么：` / `为什么要有：` / `和谁配合：` 三行头(黄 DOC3)、新文件缺头注释(黄 HDR,缺省关,`check.builtin` 写了才开)、未核实教训条数(黄 L1)、inbox 结构坏了(红 L5)、标题几乎相同(黄 L4)、规则文件(见 rules)、方案头、`AGENTS.md`、系统图首页预算。
   - **方案头**(`docs/plans/**/*.md` 开头 12 个非空行里的 `状态:` / `取代:` / `被取代:`):`取代` / `被取代` 指向不存在的文件(相对方案文件所在目录)红 PLN1;`docs/plans/archive/` 下的方案缺 `状态:`、或写了 `被取代:` 而状态不是 `已被取代` 黄 PLN2。
   - **AGENTS.md**:整个文件约超 1,500 token 黄 AGENTS1;有 `AGENTS.md` 和 `CLAUDE.md` 但 `CLAUDE.md` 里没有单独一行 `@AGENTS.md` 黄 AGENTS2(Claude Code 有 `CLAUDE.md` 就不读 `AGENTS.md`)。
   - **系统图首页**超 `map.index_tokens` 黄 MAP1。
 - **check --memory 目录**:预算按估算 token(中文按字数,其余字符数/4)。索引超预算(M2)、主题页超预算(M3)只报黄;未核实条目数报黄(M6);标题几乎相同报黄(M7:标题取索引里 `[标题](文件)` 的链接文字,没列进索引的页用文件名;去大小写、空白、标点后 difflib 相似度 ≥ `title_ratio`,缺省 0.8,教训库体检 L4 共用);断链(`[[页名]]` 和相对链接,M5)、子目录超过两级(M4,`archive/`、`.trash/`、`.git/` 除外)、没有 `MEMORY.md` / `INDEX.md`(M1)报红。阈值取 `expanded(cfg)["memory"]`,`memory` 段可覆盖 `index_tokens`、`page_tokens`、`title_ratio`。
 - **lessons**:`docs/lessons/*.md`,每条 `## 标题` 加 `键: 值` 行,写出顺序:`概述`(何时适用,含路径和关键词)、`状态: 已核实|未核实`、`更新: YYYY-MM-DD`(add 自动写)、`路径: glob, glob`(可选,升成规则时写)、`规则: 一句话`(可选)、`内容: ...`(最后一栏,可跨多行)。代码围栏(``` / ~~~)里的行不当标题和键。旧版写的 `日期:` 读作 `更新:`。`find 关键词...`(最多 3 条,未核实的标“(未核实)”;路径分隔符 `\` 与 `/` 等价)、`add 标题 -s 概述 -b 内容 [--unverified]`(缺省写已核实;**库里已有同标题条目(忽略大小写和空白)时原地覆盖它**并更新 `更新`、输出“已覆盖”,保留它的路径 / 规则,旧说法靠 git 历史留着,否则追加进 `inbox.md`)、`status`(inbox 条数、最早一条距今天数、未核实条数)。`inbox.md` 结构坏了报红 L5(钩子里也查):同一条里同一个键出现两次(`merge=union` 合并拼出的交错字段),或标题忽略大小写和空白后重复,由合并的人解决。找不到 `nomess.json` 报错,不建库。
 - **rules** [`--check`]:从教训条目(`inbox.md` 除外)和 `docs/systems/*.md` 里 `## 坑`(或 `## Pitfalls`)段下的 `### 标题` 条目,凡带 `路径:` 和 `规则:`、且 `状态:` 明确是已核实的,生成 `.claude/rules/nomess/<8 位哈希>.md`。没写状态或未核实的不生成。**路径集合相同的条目进同一个文件,文件的 `paths` 就是条目自己写的 glob**(不按子系统放大范围);文件名是这组 glob 的 sha1 前 8 位。glob 语义对齐 Claude Code(https://code.claude.com/docs/en/memory#path-specific-rules):不带 `/` 的(如 `*.py`)匹配任意层,`/` 开头的只在项目根,带 `/` 的从项目根算、`*` 不跨 `/`,`**` 任意层目录,`{a,b}` 展开(最多 1000 个),`[abc]` 字符组,`\[` 转义;`!` 取反、`/` 结尾、`[` 不配对不支持(RUL5)。文件格式固定:frontmatter 只有非空的 `paths`(YAML 列表,双引号),一行生成提示,之后每条一行 `- <规则> → <文件>#<标题>`。内容没变不写;没有条目时清掉旧文件和空目录;只动 `.claude/rules/nomess/`,写和删之前确认这个目录和目标文件都不经过符号链接 / junction,经过就报错不写。`--check` 只比对,过时退出码 1。check 报:红 RUL1(frontmatter 不是生成的格式,会变成常驻加载)、黄 RUL2(过时)、RUL3(超 `rules.file_tokens`)、RUL4(glob 在 `git ls-files` 里匹不到任何文件)、RUL5(只写了路径或规则之一 / 状态不是已核实 / glob 不支持 / 规则超 40 字或 25 词)。主分支提交后的 hook 也会跑它。
-- **status** [`--json`] [`--no-exec`] [`--suggest`]:一行概览——生成段过时数、记忆超预算数、inbox 条数、项目记忆目录路径;信号够线时再给一行升降档建议(同一条只提示一次,见 `suggest.py`)。记忆目录按 Claude Code 的规则定位:settings 的 `autoMemoryDirectory` > `CLAUDE_CODE_PROJECT_DIR_NAME`(配合 `CLAUDE_CONFIG_DIR`)> `<配置目录>/projects/<git 主仓库路径,非字母数字换成 ->/memory`;定不下来(不存在、大小写不同的同名目录不止一个)为空,不往上级猜。`--no-exec` 时过时数不跑 cmd / py 生成器。`--suggest` 列全部信号和数。JSON 键:`stale`、`memory_over`、`inbox`、`memory_dir`、`memory_source`(怎么定的)、`memory_problem`(定不下来的原因)、`lessons_dir`、`suggest`(没提示过的升降档建议,没有为空)。
+- **status** [`--json`] [`--no-exec`] :一行概览——生成段过时数、记忆超预算数、inbox 条数、项目记忆目录路径。记忆目录按 Claude Code 的规则定位:settings 的 `autoMemoryDirectory` > `CLAUDE_CODE_PROJECT_DIR_NAME`(配合 `CLAUDE_CONFIG_DIR`)> `<配置目录>/projects/<git 主仓库路径,非字母数字换成 ->/memory`;定不下来(不存在、大小写不同的同名目录不止一个)为空,不往上级猜。`--no-exec` 时过时数不跑 cmd 生成器。JSON 键:`stale`、`memory_over`、`inbox`、`memory_dir`、`memory_source`(怎么定的)、`memory_problem`(定不下来的原因)、`lessons_dir`。
 
 ## 跨平台和双语(P9)
 
@@ -123,10 +125,10 @@
 
 ### 有效配置(`nm_config.py`)
 
-- `expanded(cfg)`:深合并 `DEFAULTS`;`check.builtin`、`review.level` 没写时取 `SIZE[size]`;`suggest: false` 保留。`DEFAULTS` 同时是合法键表(`"*"` = 名字随用户取的那层的条目样子,只用于认键,不往用户条目里补);列表条目的键在 `ITEM_KEYS`。不认识的键报黄 CFG1(带最近的合法键)。
-- `Effective(cfg)`:`eff(path) -> {"off", "checks"(开着的按文件号:BUILTIN 里 file 类的 builtin 号 + forbid / require 规则的 id,按 scope 依次 add / remove), "smells", "level"(scope 写过的号 → 颜色), "review"}`。scope 合并:只看命中的条目,具体程度 = 命中这个文件的 glob 里最具体的一个(第一个通配符前的字面前缀长度,相同再比字面字符总数),从不具体到具体逐键覆盖,不看先后;两条一样具体、命中同一文件、写了同一个键(`smells.x` / `level.x` / `checks.x` / `review` / `off`)退出 2。内置测试 scope(`TEST_GLOBS`,关 D1 P1 P2 P5 S1 S2)永远排最前。
+- `expanded(cfg)`:深合并 `DEFAULTS`;`check.builtin`、`review.level` 没写时取 `SIZE[size]`。`DEFAULTS` 同时是合法键表(`"*"` = 名字随用户取的那层的条目样子,只用于认键,不往用户条目里补);列表条目的键在 `ITEM_KEYS`。不认识的键报黄 CFG1(带最近的合法键)。
+- `Effective(cfg)`:`eff(path) -> {"off", "checks"(开着的按文件号:BUILTIN 里 file 类的 builtin 号 + forbid / require 规则的 id,按 scope 依次 add / remove), "smells"}`。scope 合并:只看命中的条目,具体程度 = 命中这个文件的 glob 里最具体的一个(第一个通配符前的字面前缀长度,相同再比字面字符总数),从不具体到具体逐键覆盖,不看先后;两条一样具体、命中同一文件、写了同一个键(`smells.x` / `checks.x` / `off`)退出 2。内置测试 scope(`TEST_GLOBS`,关 D1 P1 P2 P5 S1 S2)永远排最前。
 - `BUILTIN` 是 `check.builtin` 的词表并标出 file / tree 类;`SIZE` 是三档缺省(小 D1 P1 S1 + light;中加 A1 + standard;大再加 C4 PL-DUP PL-STALE)。
-- `LOOSEN`(B2 判法表,表里没有的键不比):`check.builtin`、`smells.extra_ext`、`arch.independent`、`arch.forbid` 只许增;`arch.layers` 只许增且已有层的相对顺序不变;`check.rules`、`arch.relations` 按 id 删或改都算(level 黄改红除外);`check.baseline`、`systems` 任何改动都算;`smells.*` 阈值变大算;`review.level` 变低算;`map.*` 已有表的 glob / regex / columns 改动、`may_be_empty` 改成 true、删表算;`scopes` 按 glob 比:glob 增删(改名 = 一删一增)算,同一 glob 下两边都有的键变松算,只写一边的键除"新加最严的(checks.add、level red、review strict、off false)/ 删掉最松的(checks.remove、level yellow、review off、off true)"外都算。后四包要加键只在自己的区块里加行。
+- `LOOSEN`(B2 判法表,表里没有的键不比):`check.builtin`、`smells.extra_ext`、`arch.independent`、`arch.forbid` 只许增;`arch.layers` 只许增且已有层的相对顺序不变;`check.rules`、`arch.relations` 按 id 删或改都算(level 黄改红除外);`check.baseline`、`systems` 任何改动都算;`smells.*` 阈值变大算;`review.level` 变低算;`map.*` 已有表的 glob / regex / columns 改动、`may_be_empty` 改成 true、删表算;`scopes` 按 glob 比:glob 增删(改名 = 一删一增)算,同一 glob 下两边都有的键变松算,只写一边的键除"新加最严的(checks.add、off false)/ 删掉最松的(checks.remove、off true)"外都算。后四包要加键只在自己的区块里加行。
 
 ### 提示语和缓存
 
@@ -135,14 +137,12 @@
 - 快照新读取方法:`snap.oid(path)`、`snap.diff(base)`(`{路径: A|M|D}`)、`snap.renames(base)`(`{新: 旧}`);清单不含 `.nomess/`。
 
 <!-- >>> P22 -->
-### 钩子管理器、停用、review-input、升降档建议(P22)
+### 钩子管理器、停用、review-input(P22)
 
 - **接入方式**(`githook.manager`,`githook.status` 的 `manager`):`native`(钩子文件自己写)、`husky`(`core.hooksPath` 指向 `.husky/_`:接入 = 用户脚本 `.husky/<钩子名>` 里有启动器的调用;`install` 不往 `.husky/_` 写任何东西,打出配方)、`framework`(钩子目录里的文件是 pre-commit 框架写的:接入 = `.pre-commit-config.yaml` 里有 `id: nomess`(pre-commit 阶段)和 `id: nomess-merge`(pre-merge-commit 阶段),`install` 打出两个本地 hook 的 YAML 和 `pre-commit install --hook-type pre-commit --hook-type pre-merge-commit`)。`hooks status` 逐项报。
 - **hooksPath 范围**:钩子文件只调 `$(git rev-parse --git-common-dir)/nomess-hook`、不写本仓库路径,全局绝对 hooksPath 下也安全;相对 hooksPath 每个 worktree 各自解析,`doctor` 逐个 worktree 查并单独报没接的;`doctor` 报接入方式、钩子目录、启动器位置和 `.nomess/cache/` 大小。
 - **停用**:`hooks uninstall` 只删内容和自己写的一致的钩子文件,启动器换成一行 `exit 0` 的存根(`githook.STUB_BODY`);存根就是主动卸载的记录:guard 不 deny 也不提示,`doctor` 报"已停用",`hooks install` 恢复。husky、框架的接线不动(启动器是存根时它们是空操作)。
-- **review-input** `nomess review-input <基准> [片段文件]`:输出顺序固定:审查档(diff 涉及文件里最严的 scope 审查档,点出文件)→ 必审(新增 `allow`、新冻结的规则号、被放宽的基线 / 配置;`cmd` 规则这里不执行,新冻结的 `cmd` 规则号的 B1 标"未执行,无法核对"、不当新违规)→ 新增红黄项(存量不列)→ 路径命中改动文件的教训标题 → diff → 片段文件原样。检查结果取 `evaluate(HEAD 树, 基准树, exec_cmd=False)`。
-- **升降档建议**(`suggest.py`,第 4 层):信号、线和窗口见模块头注释和 `suggest` 段;`status` 一行、`status --suggest` 列全部、`.nomess/suggest.json` 记提示过的建议(`size` 变了清空)(`status --json` 不记录);建议只在 `status` 和状态栏出,不进 AGENTS.md 入口段。大项目只出降档。
-- **缓存事实**:P22 不新增(`suggest` 直接读 git 历史,不进缓存)。
+- **review-input** `nomess review-input <基准> [片段文件]`:输出顺序固定:审查档(取全局 `review.level`)→ 必审(新增 `allow`、新冻结的规则号、被放宽的基线 / 配置;`cmd` 规则这里不执行,新冻结的 `cmd` 规则号的 B1 标"未执行,无法核对"、不当新违规)→ 新增红黄项(存量不列)→ 路径命中改动文件的教训标题 → diff → 片段文件原样。检查结果取 `evaluate(HEAD 树, 基准树, exec_cmd=False)`。加 `--cmd` 把审查清单和上面这份输入从标准输入交给 `review.cmd`(argv 数组,不经 shell)并打印它的输出;非零退出或超过 600 秒报错,不当"没发现问题"。
 <!-- <<< P22 -->
 <!-- >>> P23 -->
 

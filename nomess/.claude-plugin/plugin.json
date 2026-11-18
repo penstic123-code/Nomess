@@ -1,6 +1,6 @@
 {
   "name": "nomess",
-  "version": "0.9.2",
+  "version": "1.0.0",
   "description": "Keeps AI-written code from turning into a mess: commit-time checks, path-scoped lessons, a generated system map, a design-first workflow and reviews",
   "author": {
     "name": "penstic123-code"

@@ -1,7 +1,7 @@
 ---
 name: init
 description: >-
-  给项目搭 nomess 骨架，或升到更大的档：先问大小和语言，建文档、AGENTS.md、nomess.json，装 git 钩子。
+  给项目搭 nomess 骨架，或升到更大的档：先问大小和语言，建 nomess.json 和 AGENTS.md 入口，装 git 钩子，生成系统图。
 disable-model-invocation: true
 ---
 
@@ -27,23 +27,13 @@ disable-model-invocation: true
 - **项目名**：仓库根目录名，用作 `AGENTS.md` 的标题。
 - **子系统**：读顶层目录和入口文件，列出名字和路径 glob（一个文件只能匹配一个）。空项目或看不出来，就问（只有一块也行）。
 
-## 2. 按大小建文件
+## 2. 建文件
 
-| 文件 | small | medium | large |
-|---|---|---|---|
-| `nomess.json`、`docs/overview.md`、`AGENTS.md` + `CLAUDE.md`、`docs/systems/<name>.md`、`docs/lessons/`、`.gitignore`、`.gitattributes` | 是 | 是 | 是 |
-| `docs/plans/archive/.gitkeep`（方案按 `plan.md` 写，它不拷进项目） | | 是 | 是 |
-| `docs/schedule.md`、`docs/ownership-map.md` | | | 是 |
+每个大小都一样：`nomess.json`、`AGENTS.md` + `CLAUDE.md`、`.gitignore`、`.gitattributes`；系统图 `docs/system-map/` 是生成的（small：只有首页）。其余现在都不建：`docs/overview.md`、每个子系统的说明页、教训库、`docs/plans/`、`docs/schedule.md`、`docs/ownership-map.md`，第一次用到时才照模板建（`/nomess:lesson` 自己建 inbox；方案、排期、归属表由 `workflow` skill 建）。
 
-系统图 `docs/system-map/` 每个大小都生成（small：只有首页）。
-
-1. `nomess.json`：拷模板；填 `main_branch`、`size`、`lang`、`systems`。large：在 `docgen` 里加 `"owners": {"file": "docs/ownership-map.md", "builtin": "owners"}`。不要写 `check.builtin` 和 `review.level`：它们跟着 `size` 走。
-2. `docs/overview.md`（给人看）：拷模板；按读到的代码写意图、原理（一张 Mermaid 图加几句）和功能；不写代码名；看不懂的保留占位符。
-3. `AGENTS.md`：没有就新建 → `# <项目名>`、空一行，再接 `AGENTS-nomess.md`；已有 → 空一行后把 `AGENTS-nomess.md` 的内容追加到末尾（已有 `## nomess` 段就按标记规则处理）。`CLAUDE.md`：没有就新建，只有一行 `@AGENTS.md`；已有但没有单独一行这个 → 把它插在第一行。
-4. `docs/systems/<name>.md`：每个子系统一页，从 `system-page.md` 拷，第一行 `# <name>`；三行头能写就写。
-5. `docs/lessons/`：拷 `inbox.md` 和 `README.md`。
-6. `.gitignore`：没有就加一行 `.nomess/`。`.gitattributes`：下面三行缺哪行补哪行（一行一个模式）：`docs/system-map/** text eol=lf`、`.claude/rules/nomess/** text eol=lf`、`<lessons_dir>/inbox.md merge=union`（`lessons_dir` 缺省 `docs/lessons`）。
-7. medium 和 large：建方案目录。large：拷 `schedule.md` 和 `ownership-map.md`。
+1. `nomess.json`：拷模板；填 `main_branch`、`size`、`lang`、`systems`。不要写 `check.builtin` 和 `review.level`：它们跟着 `size` 走。
+2. `AGENTS.md`：没有就新建 → `# <项目名>`、空一行，再接 `AGENTS-nomess.md`；已有 → 空一行后把 `AGENTS-nomess.md` 的内容追加到末尾（已有 `## nomess` 段就按标记规则处理）。`CLAUDE.md`：没有就新建，只有一行 `@AGENTS.md`；已有但没有单独一行这个 → 把它插在第一行。
+3. `.gitignore`：没有就加一行 `.nomess/`。`.gitattributes`：下面三行缺哪行补哪行（一行一个模式）：`docs/system-map/** text eol=lf`、`.claude/rules/nomess/** text eol=lf`、`<lessons_dir>/inbox.md merge=union`（`lessons_dir` 缺省 `docs/lessons`）。
 
 **标记规则**（每个 `docgen` 项）：`docgen` 只重写该项文件里恰好一对 `<!-- GEN:<key> BEGIN -->` / `<!-- GEN:<key> END -->` 之间的内容。目标文件已存在时：恰有一对 → 登记；没有 → 在末尾追加模板里的块（`nomess` 项是 `## nomess` 标题加这对标记）再登记；多于一对，或用户不让改 → 不登记，报告。
 
@@ -95,6 +85,6 @@ jobs:
 
 ## 4. 重跑：改大小
 
-- **变大**：在 `nomess.json` 里只改 `size`（large：再加 `owners` 这个 docgen 项）；只建新大小缺的文件（按第 2 节）；已有的文件一律不动。然后做第 3 节。报告现在生效的检查（`nomess.py check --rules` 里没标"not enabled"的行）。如果 `nomess.json` 里写了明确的 `check.builtin`，保持原样；告诉用户它缺新大小的哪些缺省项（medium 多 A1；large 多 C4、PL-DUP、PL-STALE）。
+- **变大**：在 `nomess.json` 里只改 `size`；已有的文件一律不动，新大小多出的文件第一次用到时再建。然后做第 3 节。报告现在生效的检查（`nomess.py check --rules` 里没标"not enabled"的行）。如果 `nomess.json` 里写了明确的 `check.builtin`，保持原样；告诉用户它缺新大小的哪些缺省项（medium 多 A1；large 多 C4、PL-DUP、PL-STALE）。
 - **变小**：什么都不改。变小会关掉一些检查，提交闸门会把这当放宽拦下；告诉用户要由人来做：改 `size`，用 `--no-verify` 提交，并给 PR 打上 `nomess-loosen` 标签。降到 `small` 之前，先把指向系统图分页（`files.md`、`deps.md` 等）的链接都改成指向首页 `index.md`，和 `size` 一起提交；`small` 会删掉分页，留着旧链接会被 DOC1 报断链。
-- **不变**：只建缺的文件，然后做第 3 节。
+- **不变**：做第 3 节。

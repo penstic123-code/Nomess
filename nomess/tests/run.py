@@ -104,7 +104,7 @@ def test_fixture(tmp):
     p = nm(root, "status")
     expect(p.returncode == 0 and "inbox 2 条" in p.stdout, "status 文本不对")
     s = json.loads(nm(root, "status", "--json").stdout)
-    expect(set(s) == {"stale", "memory_over", "inbox", "memory_dir", "memory_source", "memory_problem", "lessons_dir", "suggest"}
+    expect(set(s) == {"stale", "memory_over", "inbox", "memory_dir", "memory_source", "memory_problem", "lessons_dir"}
            and s["inbox"] == 2 and s["stale"] >= 1, "status --json 内容不对: %r" % s)
 
 
@@ -231,9 +231,8 @@ def test_cmd_entry(tmp):
 
 def test_review2(tmp):
     """第二轮审查补的用例:CRLF 正文 / 旧基线 / 非法正则 / map 表名 / 链接检查。"""
-    # 12: py 生成器返回 CRLF 正文,写进 CRLF 文件不出 \r\r\n
-    root = mkrepo(tmp, "r2crlf", {"docgen": {"g": {"file": "docs/t.md", "py": "gen.py:g"}}})
-    put(root, "gen.py", "def g():\n    return 'a\\r\\nb\\r\\n'\n")
+    # 12: cmd 生成器输出的正文,写进 CRLF 文件不出 \r\r\n
+    root = mkrepo(tmp, "r2crlf", {"docgen": {"g": {"file": "docs/t.md", "cmd": ["python", "-c", "print('a\\nb')"]}}})
     path = put(root, "docs/t.md", b"x\r\n<!-- GEN:g BEGIN -->\r\nold\r\n<!-- GEN:g END -->\r\n")
     nm(root, "docgen")
     data = open(path, "rb").read()
@@ -269,9 +268,8 @@ def test_review2(tmp):
     put(mem, "topic.md", "## a\n")
     p = nm(root, "check", "--memory", mem)
     expect(p.returncode == 0, "记忆里的 (topic.md#section) 不应报断链")
-    # 扩展依赖:status --json 带 lessons_dir;--json 时 py 生成器的 print 不进 stdout
-    root = mkrepo(tmp, "r2json", {"lessons_dir": "kb/les", "docgen": {"g": {"file": "docs/t.md", "py": "gen.py:g"}}})
-    put(root, "gen.py", "def g():\n    print('noise')\n    return 'new'\n")
+    # 扩展依赖:status --json 带 lessons_dir
+    root = mkrepo(tmp, "r2json", {"lessons_dir": "kb/les", "docgen": {"g": {"file": "docs/t.md", "cmd": ["python", "-c", "print('new')"]}}})
     put(root, "docs/t.md", "<!-- GEN:g BEGIN -->\nold\n<!-- GEN:g END -->\n")
     p = nm(root, "status", "--json")
     try:
@@ -279,9 +277,13 @@ def test_review2(tmp):
     except ValueError:
         st = {}
     expect(st.get("lessons_dir") == "kb/les", "status --json 要带 lessons_dir: %r" % p.stdout)
-    expect("noise" in p.stderr, "生成器的 print 应转到 stderr")
     p = nm(root, "check", "--json")
-    expect(p.stdout.strip().startswith("[") and "noise" not in p.stdout, "check --json 的 stdout 只许有 JSON: %r" % p.stdout)
+    expect(p.stdout.strip().startswith("["), "check --json 的 stdout 只许有 JSON: %r" % p.stdout)
+    # 老配置的 py 生成器:报清楚的配置错误(退出 2),提示改用 cmd
+    root = mkrepo(tmp, "r2py", {"docgen": {"g": {"file": "docs/t.md", "py": "gen.py:g"}}})
+    put(root, "docs/t.md", "<!-- GEN:g BEGIN -->\nold\n<!-- GEN:g END -->\n")
+    p = nm(root, "docgen")
+    expect(p.returncode == 2 and "cmd" in p.stderr, "py 生成器应报配置错误并提示 cmd: %r" % p.stderr)
 
 
 def test_dream(tmp):
@@ -480,10 +482,10 @@ def test_review3(tmp):
     nm(root, "rules")
     expect(len(rule_files(root)) == 1 and nm(root, "rules", "--check").returncode == 0, "带方括号的路径应能扫到教训")
 
-    # 1 --no-exec:不跑 cmd 规则和 cmd / py 生成器
+    # 1 --no-exec:不跑 cmd 规则和 cmd 生成器
     mark = os.path.join(tmp, "r3ran")
     touch = ["python", "-c", "open(%r, 'w').write('x')" % mark]
-    root = mkrepo(tmp, "r3noexec", {"docgen": {"s": {"file": "d.md", "cmd": touch}, "p": {"file": "d.md", "py": "g.py:g"}},
+    root = mkrepo(tmp, "r3noexec", {"docgen": {"s": {"file": "d.md", "cmd": touch}},
                                    "check": {"rules": [{"id": "C1", "level": "red", "what": "w", "why": "y", "cmd": touch}]}},
                   [("d.md", "<!-- GEN:s BEGIN -->\n<!-- GEN:s END -->\n<!-- GEN:p BEGIN -->\n<!-- GEN:p END -->\n"),
                    ("g.py", "def g():\n    open(%r, 'w').write('x')\n    return 'y'\n" % mark)])
@@ -774,6 +776,32 @@ def test_lang(tmp):
     expect(len([l for l in fail_lines(p) if l.startswith("失败")]) == 1 and "修法" in p.stdout, "zh 的 doctor 应报中文: %r" % p.stdout)
 
 
+def test_review_cmd(tmp):
+    """review-input --cmd:清单 + 审查输入走标准输入交给 review.cmd 并打印它的输出;非零退出报错。"""
+    def git(root, *a):
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", *a], cwd=root, check=True, capture_output=True)
+    echo = ["python", "-c", "import sys; t = sys.stdin.read(); print('GOT', len(t) > 200, '## ' in t)"]
+    root = mkrepo(tmp, "rcmd", {"review": {"cmd": echo}}, [("a.txt", "1\n")])
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "base")
+    put(root, "a.txt", "2\n")
+    git(root, "commit", "-qam", "change")
+    p = nm(root, "review-input", "--cmd", "HEAD~1")
+    expect(p.returncode == 0 and "GOT True True" in p.stdout, "review-input --cmd 应把输入交给 review.cmd: %r %r" % (p.stdout, p.stderr))
+    put(root, "nomess.json", json.dumps({"format": "nomess/1", "main_branch": "main", "review": {"cmd": ["python", "-c", "import sys; sys.exit(3)"]}}))
+    git(root, "commit", "-qam", "bad cmd")
+    p = nm(root, "review-input", "--cmd", "HEAD~1")
+    expect(p.returncode == 2 and "3" in p.stderr, "review.cmd 非零退出应报错: %r" % p.stderr)
+
+
+def test_old_keys(tmp):
+    """老配置里的 suggest 段、scopes 的 level / review:不报错退出,只出黄色 CFG1(不认识的键),不再生效。"""
+    root = mkrepo(tmp, "oldkeys", {"lang": "en", "suggest": False, "scopes": [{"paths": ["src/**"], "why": "w", "level": {"D1": "red"}, "review": "strict"}]},
+                  [("src/a.py", "x = 1" + chr(10))])
+    p = nm(root, "check", "--all")
+    expect(p.returncode == 0 and "scopes[0].level" in p.stdout and "scopes[0].review" in p.stdout and "suggest" in p.stdout, "老键应只报黄 CFG1: %r %r" % (p.stdout, p.stderr))
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="nomess-test-")
     try:
@@ -785,6 +813,8 @@ def main():
         test_lessons_index(tmp)
         test_cmd_entry(tmp)
         test_review2(tmp)
+        test_review_cmd(tmp)
+        test_old_keys(tmp)
         test_dream(tmp)
         test_rules(tmp)
         test_review3(tmp)

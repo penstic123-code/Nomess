@@ -47,7 +47,7 @@ Read-only: the proposal file is the only file you write; run only the commands b
    - Project repo: if `git diff --cached --name-only` prints anything (the user staged something), don't commit the project repo in step 5; say so.
 3. Do all remaining items in one go:
    - Update the `[[…]]` links and index lines pointing to deleted, merged or moved pages; the index has one line per topic `[topic](file) — when to use`.
-   - Lessons: write with `nomess.py lessons add` (same title overwrites in place); delete processed inbox entries.
+   - Lessons: write with `nomess.py lessons add` (same title overwrites in place); delete processed inbox entries. The first time topic pages are created, also copy `${CLAUDE_PLUGIN_ROOT}/skills/init/templates/<lang>/docs/lessons/README.md` to the lessons directory and add the docgen entry `"lessons-index": {"file": "<lessons dir>/README.md", "builtin": "lessons-index"}`.
    - Path rule: add `Paths:` and `Rule:` to the entry (or under `## Pitfalls` on a system page).
    - Check rule, `arch` entry, threshold: edit `nomess.json` (format in `${CLAUDE_PLUGIN_ROOT}/scripts/README.md`); if `nomess.py check` then reports red for a new rule or `arch` entry, drop it and report it (never freeze it). Delete the lesson once its rule is registered.
 4. Validate and fix until it passes: `nomess.py refresh`; `nomess.py check` has no red; `nomess.py check --memory <memory dir>` has no red (no broken links); the memory index has no more tokens than before.

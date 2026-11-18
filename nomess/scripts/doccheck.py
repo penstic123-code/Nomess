@@ -26,8 +26,7 @@ def system_pages(snap, cfg):
     for name in dict.fromkeys(names):
         rel = "docs/systems/%s.md" % name
         if not snap.isfile(rel):
-            out.append(F("yellow", "DOC3", rel, 0, "missing", t("DOC3_NONE", name)))
-            continue
+            continue  # 说明页按需建,没有不报
         head = [l for l in _lines(snap, rel) if l.strip()][:12]
         miss = [c for c in NAMES["system_head"] if not any(re.match("(?:%s)[:：]" % "|".join(map(re.escape, alts("system_head", c))), l) for l in head)]
         if miss:

@@ -8,7 +8,7 @@ argument-hint: "<the lesson in one sentence>"
 
 # lesson: record a lesson
 
-Lessons live in the repo, so coding subagents can look them up before they start.
+Lessons live in the repo, so coding subagents can look them up before they start. Nothing is set up in advance: the first `lessons add` creates `docs/lessons/` and `inbox.md` by itself.
 
 ## Don't record
 

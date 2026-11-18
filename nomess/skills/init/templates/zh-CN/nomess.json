@@ -4,31 +4,10 @@
   "size": "small",
   "lang": "zh-CN",
   "systems": {},
-  "check": {
-    "rules": []
-  },
-  "smells": {
-    "file_lines": 800,
-    "func_lines": 80,
-    "clone_tokens": 100,
-    "clone_lines": 8
-  },
-  "arch": {
-    "layers": [],
-    "independent": [],
-    "forbid": [],
-    "relations": []
-  },
-  "allow": [],
   "docgen": {
     "nomess": {
       "file": "AGENTS.md",
       "builtin": "agents-entry"
-    },
-    "lessons-index": {
-      "file": "docs/lessons/README.md",
-      "builtin": "lessons-index"
     }
-  },
-  "map": {}
+  }
 }

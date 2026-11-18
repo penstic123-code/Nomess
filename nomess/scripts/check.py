@@ -7,7 +7,7 @@
   命令:  cmd(列表,工作目录=仓库根;非零退出就报,取输出最后一行)
 例外只走顶层 allow(rule + file | from+to + reason)。
 另查(内置,不用登记):见 LEGACY 和 scripts/README.md。
---no-exec 不运行项目里的任何代码(跳过 cmd 规则和 cmd / py 生成器)。
+--no-exec 不运行项目里的任何代码(跳过 cmd 规则和 cmd 生成器)。
 --memory <目录> 做记忆体检(软预算、标题几乎相同只报黄,断链/目录超两级报红)。
 """
 import importlib
@@ -52,7 +52,6 @@ GATE_LEGACY = frozenset({"RUL1", "L5", "DOC1", "PLN1"})  # 钩子里跑的旧检
 LEGACY = frozenset({"DOC1", "DOC3", "HDR", "L1", "L4", "L5", "RUL1", "RUL2", "RUL3", "RUL4", "RUL5",
                     "PLN1", "PLN2", "AGENTS1", "AGENTS2", "MAP1", "GEN", "M1", "M2", "M3", "M4", "M5", "M6", "M7"})
 RESERVED = frozenset(BUILTIN) | LEGACY | DIAG
-REVIEW_RANK = nm_config.REVIEW_LEVELS
 
 SKIP_DIRS = {"archive", ".trash", ".git"}
 
@@ -108,7 +107,7 @@ def run_rule(snap, r, only=None):
 
 
 def stale_sections(snap, cfg, exec_=True):
-    """过时的生成段和系统图;exec_ 为假时不跑 cmd / py 生成器(不执行项目代码)。"""
+    """过时的生成段和系统图;exec_ 为假时不跑 cmd 生成器(不执行项目代码)。"""
     stale, _ = docgen.run(snap, cfg, exec_=exec_)
     out = [F("yellow", "GEN", f, 0, n, t("GEN_STALE", n)) for n, f in stale]
     if snap.isdir(nm_map.OUT_DIR):
@@ -271,15 +270,13 @@ def _checked(name, fs):
 
 def observe(cand, cfg, eff, specs, mods, changes, only, gate, exec_cmd):
     """跑检测并按开关定色 -> (观测, 本轮真正启用并检查过的规则号)。观测已过开关、没过 allow;每条多 sev(原始颜色)。
-    gate(钩子):旧检查只跑可能变红的(顶层红,或某条 scope 把它升红);cmd 规则只在已跟踪文件的工作区和索引一致时跑,
+    gate(钩子):旧检查只跑红的;cmd 规则只在已跟踪文件的工作区和索引一致时跑,
     否则跳过并报黄 CMD1(它读的是工作区,和待检的索引对不上,交给 CI)。"""
-    def may_be_red(rid, level):
-        return level == "red" or any(sc.get("level", {}).get(rid) == "red" for sc in eff.cfg["scopes"])
     raw, ran = [], set()
     cmd_ok = None  # 第一条要跑的 cmd 规则才去问 git(没有 cmd 规则就不起这个子进程)
     skipped = []
     for r in eff.cfg["check"]["rules"]:
-        if gate and not may_be_red(r["id"], r["level"]) or "cmd" in r and not exec_cmd:
+        if gate and r["level"] != "red" or "cmd" in r and not exec_cmd:
             continue
         if "cmd" in r and cmd_ok is None:
             cmd_ok = not (gate and _worktree_dirty(cand.root))
@@ -293,9 +290,6 @@ def observe(cand, cfg, eff, specs, mods, changes, only, gate, exec_cmd):
     if gate:
         legacy += doccheck.red(cand)
         ran |= GATE_LEGACY
-        if hdr and may_be_red("HDR", "yellow"):
-            legacy += doccheck.missing_headers(cand)
-            ran.add("HDR")
     else:
         legacy += doccheck.findings(cand, cfg) + nm_rules.findings(cand, cfg) + stale_sections(cand, cfg, exec_cmd)
         ran |= {i for i in LEGACY if not i.startswith("M") and (i != "HDR" or hdr)} - (set() if exec_cmd else {"GEN"})
@@ -317,7 +311,6 @@ def observe(cand, cfg, eff, specs, mods, changes, only, gate, exec_cmd):
             on = [x for x in [f["file"]] + f["also"] if x != "-" and r in eff(x)["checks"]]
             if not on:
                 continue
-            f["level"] = "red" if any(eff(x)["level"].get(r, f["sev"]) == "red" for x in on) else "yellow"
         out.append(f)
     if skipped:
         out.append(_diag(F("yellow", "CMD1", "-", 0, ",".join(skipped), t("CMD1", ", ".join(skipped)), k=[])))
@@ -469,7 +462,7 @@ def _diag(f):
 def evaluate(cand, base, *, exec_cmd, gate=False, full=False, allow_loosen=False):
     """对待检快照 cand 相对基准快照 base(None = 还没有提交)做全部检查,返回分好类的结果(形状固定):
     {skipped, findings(每条带 state: new | worse | grew | frozen | loosen), new_allow, new_frozen, review, writes}。
-    exec_cmd:跑不跑 cmd 规则和 cmd / py 生成器;gate:钩子(旧检查只跑红级,见 GATE_LEGACY);full:按文件的检测全树查
+    exec_cmd:跑不跑 cmd 规则和 cmd 生成器;gate:钩子(旧检查只跑红级,见 GATE_LEGACY);full:按文件的检测全树查
     (手动 check);allow_loosen:人批准过放宽(--ci --allow-loosen),以 cand 的基线为准,B1 / B2 降黄。配置错误抛 ValueError(退出 2)。"""
     res = {"skipped": None, "findings": [], "new_allow": [], "new_frozen": [], "review": None, "writes": {}}
     btext = base.text(nm_config.CONFIG_NAME) if base is not None else None
@@ -567,9 +560,7 @@ def evaluate(cand, base, *, exec_cmd, gate=False, full=False, allow_loosen=False
     res["new_allow"] = [a for a in eff.cfg["allow"] if json.dumps(a, sort_keys=True, ensure_ascii=False) not in old_allow]
     res["new_frozen"] = newids
     if diff:
-        rank = REVIEW_RANK.index
-        p = max(sorted(diff), key=lambda x: rank(eff(x)["review"]))
-        res["review"] = {"level": eff(p)["review"], "file": p}
+        res["review"] = {"level": eff.cfg["review"]["level"]}
     return res
 
 
@@ -641,7 +632,7 @@ def main(argv):
     ap.add_argument("--red", action="store_true", help="what the commit hook runs; print red findings only")
     ap.add_argument("--all", action="store_true", help="do not truncate the output; list frozen findings too")
     ap.add_argument("--no-exec", dest="no_exec", action="store_true",
-                    help="run no project code: skip cmd rules and cmd / py doc generators (for read-only reviews)")
+                    help="run no project code: skip cmd rules and cmd doc generators (for read-only reviews)")
     ap.add_argument("--json", action="store_true",
                     help="print a JSON array, each item level / rule / file / line / msg / state / frozen (for the extension)")
     ap.add_argument("--rules", action="store_true", help="list the rules: id, level, what it checks / what it prevents")

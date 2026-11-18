@@ -47,7 +47,7 @@ model: sonnet
    - 项目仓库：`git diff --cached --name-only` 有输出（用户自己暂存了东西），第 5 步就不提交项目仓库，并说明。
 3. 一次做完剩下的所有条目：
    - 改指向被删、被合并、被挪走的页的 `[[…]]` 链接和索引行；索引一个主题一行 `[主题](文件) — 何时用`。
-   - 教训：用 `nomess.py lessons add` 写（同标题原地覆盖）；处理完的 inbox 条目删掉。
+   - 教训：用 `nomess.py lessons add` 写（同标题原地覆盖）；处理完的 inbox 条目删掉。第一次建主题页时，再把 `${CLAUDE_PLUGIN_ROOT}/skills/init/templates/<lang>/docs/lessons/README.md` 拷进教训库目录，并加 docgen 项 `"lessons-index": {"file": "<教训库目录>/README.md", "builtin": "lessons-index"}`。
    - 路径规则：给条目加 `路径:` 和 `规则:`（系统页则加在 `## 坑` 下）。
    - check 规则、`arch` 项、阈值：改 `nomess.json`（写法见 `${CLAUDE_PLUGIN_ROOT}/scripts/README.md`）；如果 `nomess.py check` 对新规则或 `arch` 项报红，就撤掉它并报告（绝不冻结）。规则登记后删掉那条教训。
 4. 校验，没过就改到过：`nomess.py refresh`；`nomess.py check` 无红；`nomess.py check --memory <记忆目录>` 无红（没有断链）；记忆索引 token 不比之前多。

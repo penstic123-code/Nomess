@@ -1,7 +1,7 @@
 ---
 name: init
 description: >-
-  Scaffold nomess in a project, or move it to a bigger size: asks size and language, creates docs, AGENTS.md, nomess.json, installs the git hooks.
+  Scaffold nomess in a project, or move it to a bigger size: asks size and language, creates nomess.json and the AGENTS.md entry, installs the git hooks, generates the system map.
 disable-model-invocation: true
 ---
 
@@ -27,23 +27,13 @@ Templates are in `${CLAUDE_PLUGIN_ROOT}/skills/init/templates/<lang>/` (`en` or 
 - **Project name**: the repo root directory name, the `AGENTS.md` title.
 - **Subsystems**: from the top-level directories and entry files, list names and path globs (a file may match only one). Empty project or unclear: ask (one part is fine).
 
-## 2. Create, by size
+## 2. Create
 
-| File | small | medium | large |
-|---|---|---|---|
-| `nomess.json`, `docs/overview.md`, `AGENTS.md` + `CLAUDE.md`, `docs/systems/<name>.md`, `docs/lessons/`, `.gitignore`, `.gitattributes` | yes | yes | yes |
-| `docs/plans/archive/.gitkeep` (plans are written from `plan.md`, which is not copied) | | yes | yes |
-| `docs/schedule.md`, `docs/ownership-map.md` | | | yes |
+Same at every size: `nomess.json`, `AGENTS.md` + `CLAUDE.md`, `.gitignore`, `.gitattributes`; the system map `docs/system-map/` is generated (small: front page only). Nothing else is created now: `docs/overview.md`, the per-subsystem pages, the lessons library, `docs/plans/`, `docs/schedule.md` and `docs/ownership-map.md` are created from the templates the first time they are needed (`/nomess:lesson` creates the inbox by itself; the `workflow` skill creates plans, schedule and ownership map).
 
-The system map `docs/system-map/` is generated at every size (small: front page only).
-
-1. `nomess.json`: copy the template; fill in `main_branch`, `size`, `lang`, `systems`. Large: add `"owners": {"file": "docs/ownership-map.md", "builtin": "owners"}` to `docgen`. Don't write `check.builtin` or `review.level`: they follow `size`.
-2. `docs/overview.md` (for humans): copy; from the code you read, write intent, how it works (one Mermaid diagram plus a few sentences) and features; no code names; keep the placeholder where you don't understand.
-3. `AGENTS.md`: missing → `# <project name>`, a blank line, then `AGENTS-nomess.md`; present → append a blank line and the content of `AGENTS-nomess.md` (if a `## nomess` section exists, apply the marker rule). `CLAUDE.md`: missing → the single line `@AGENTS.md`; present without that standalone line → insert it as the first line.
-4. `docs/systems/<name>.md` per subsystem from `system-page.md`, first line `# <name>`; fill the three head lines where you can.
-5. `docs/lessons/`: copy `inbox.md` and `README.md`.
-6. `.gitignore`: add the line `.nomess/` if missing. `.gitattributes`: add whichever of these three lines are missing (one pattern per line): `docs/system-map/** text eol=lf`, `.claude/rules/nomess/** text eol=lf`, `<lessons_dir>/inbox.md merge=union` (`lessons_dir` defaults to `docs/lessons`).
-7. Medium and large: the plans directory. Large: copy `schedule.md` and `ownership-map.md`.
+1. `nomess.json`: copy the template; fill in `main_branch`, `size`, `lang`, `systems`. Don't write `check.builtin` or `review.level`: they follow `size`.
+2. `AGENTS.md`: missing → `# <project name>`, a blank line, then `AGENTS-nomess.md`; present → append a blank line and the content of `AGENTS-nomess.md` (if a `## nomess` section exists, apply the marker rule). `CLAUDE.md`: missing → the single line `@AGENTS.md`; present without that standalone line → insert it as the first line.
+3. `.gitignore`: add the line `.nomess/` if missing. `.gitattributes`: add whichever of these three lines are missing (one pattern per line): `docs/system-map/** text eol=lf`, `.claude/rules/nomess/** text eol=lf`, `<lessons_dir>/inbox.md merge=union` (`lessons_dir` defaults to `docs/lessons`).
 
 **Marker rule** (every `docgen` entry): `docgen` rewrites only the text between exactly one pair of `<!-- GEN:<key> BEGIN -->` / `<!-- GEN:<key> END -->` lines in the entry's file. When that file already exists: one pair → register; none → append the template's block (for `nomess`, the `## nomess` heading plus the pair) at the end and register; more than one, or the user doesn't want it changed → don't register, report it.
 
@@ -95,6 +85,6 @@ jobs:
 
 ## 4. Rerun: change size
 
-- **Bigger**: in `nomess.json` change only `size` (large: also add the `owners` docgen entry); create only the missing files of the new size from section 2; leave every existing file as it is. Then section 3. Report the checks now in effect (the lines of `nomess.py check --rules` not marked "not enabled"). If `nomess.json` has an explicit `check.builtin`, it stays as written; tell the user which defaults of the new size it lacks (medium adds A1; large adds C4, PL-DUP, PL-STALE).
+- **Bigger**: in `nomess.json` change only `size`; leave every existing file as it is; the extra files of the new size are created on first use. Then section 3. Report the checks now in effect (the lines of `nomess.py check --rules` not marked "not enabled"). If `nomess.json` has an explicit `check.builtin`, it stays as written; tell the user which defaults of the new size it lacks (medium adds A1; large adds C4, PL-DUP, PL-STALE).
 - **Smaller**: don't change anything. A smaller size switches checks off, which the commit gate blocks as a loosening; tell the user the person does it: edit `size`, commit with `--no-verify`, and label the PR `nomess-loosen`. Before going down to `small`, change every link that points to a system-map subpage (`files.md`, `deps.md`, ...) to point to the home page `index.md`, and commit that together with `size`; `small` deletes the subpages and the broken links would fail DOC1.
-- **Same**: create only missing files, then section 3.
+- **Same**: section 3.

@@ -23,7 +23,7 @@ Tests: write tests only for edge behavior that is hard to deduce correctly from 
 Before the last commit, record what code and git don't show with `nomess.py lessons add "<title>" -s "<when>" -b "<what>" --unverified`, so it goes into that commit.
 
 ## 7. Handback checklist
-Commit hash; check result in one line; failed premise ("none" if none, else which premise and what you saw); changes outside the brief ("none" if none); premises deduced but not measured; ladder line (`Ladder: …; Looked up: …`, per `nomess:lean-change`); tests (added ones and the acceptance item each covers; items confirmed by reading code, with file:line); lesson (title recorded before the last commit; "none" if none).
+Three things: the commit; the verification result (check result in one line; tests added and the acceptance item each covers; items confirmed by reading code, with file:line); where it deviated from the plan (failed premise and what you saw, changes outside the brief; "none" if none). Add `Looked up: <link>` only if what you found changed a decision.
 
 Acceptance criteria:
 - Tests: ... (edge behaviors that become test cases)

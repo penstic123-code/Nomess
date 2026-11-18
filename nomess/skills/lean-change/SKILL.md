@@ -1,7 +1,7 @@
 ---
 name: lean-change
 description: >-
-  Load before coding, fixing bugs, refactoring, adding features, choosing dependencies or designing: smallest complete change via a decision ladder, look it up when unsure, fix root causes, no patches or defensive code.
+  Load before coding, fixing bugs, refactoring, adding features, choosing dependencies or designing: smallest complete change by three questions, look it up when unsure, fix root causes, no patches or defensive code.
 ---
 
 # lean-change: smallest complete change
@@ -15,21 +15,15 @@ Lazy in the solution, never lazy in the reading: understand first, look for what
 - Check the lessons library: `nomess.py lessons find <path of the file to change, or a keyword>` returns at most 3 entries; read the full text only if useful.
 - Read a file before changing it, not just Grep snippets: this directory's rules (`.claude/rules/`) load only on Read, and must be re-Read after context compaction.
 
-## 2. Decision ladder (stop at the first rung that fully solves it)
+## 2. Three questions (stop at the first one that fully solves it)
 
-| Rung | Question | If yes |
-|---|---|---|
-| L1 | Does it need to exist? | Don't build it; name unrequested options, switches and extension points in the handback |
-| L2 | Is it already in the repo (function, tool, convention)? | Reuse it the way the surrounding code does |
-| L3 | Does the standard library / platform have it? | Use it (use the project's wrapper if there is one) |
-| L4 | Can an installed dependency do it? | Use it; don't add a dependency for a few lines |
-| L5 | Unsure, or the industry has most likely solved it? | Look it up first; follow established practice and cite the source |
-| L6 | Can one line say it? | One line |
-| L7 | None of the above | Write the least code that works |
+1. Does it need to be done? Is the requirement really asking for this change, and how far should it go? Don't build what nobody asked for; name unrequested options, switches and extension points in the handback.
+2. Does something already exist? Code in the repo, the standard library or platform, an installed dependency, an established open-source approach. Reuse it the way the surrounding code does; don't add a dependency for a few lines.
+3. Write the least complete code. If unsure, look it up first (official docs, open-source implementations, papers) and note the source.
 
 Of two options the same size, pick the one that gets edge cases right.
 
-## 3. When you must look it up (L5)
+## 3. When you must look it up
 
 Look it up first if any holds: algorithms, numerics, concurrency, protocols, file formats, security, or any problem others have surely solved; you are about to invent a mechanism, format, cache or scheduler; one attempt at the same problem already failed; you are unsure how to use a third-party library.
 
@@ -62,15 +56,11 @@ The commit runs `nomess check` in a git hook. Blocked by red: fix it, or add a t
 
 Before the last commit, record what code and git don't show: `nomess.py lessons add "<title>" -s "<when it applies: files, keywords>" -b "<what to do, why, source>" --unverified`, so the entry goes into that commit. Same title overwrites the old entry.
 
-The handback carries these lines:
+The handback carries these lines (add `Looked up: <link>` only when what you found changed the decision):
 
 ```
-Ladder: L<n> (why it stopped here); Looked up: <link, or "not looked up: reason">
 Tests: <added ones → which acceptance item each covers>; confirmed by reading code: <file:line, …>
-Lesson: <title recorded before the last commit; "none" if none>
 ```
-
-Example: `Ladder: L5 → L4 (dedupe with the installed xxhash); Looked up: xxhash README`
 
 ---
-Sources: the decision ladder (L1–L4, L6–L7), listing every place the change must reach, the never-cut list and the `shortcut:` comment are borrowed from ponytail (github.com/DietrichGebert/ponytail, MIT, skills/ponytail/SKILL.md). L5, when you must look it up, the defensive-code test, deduction before measurement, the test rules and the handback lines are added by this plugin.
+Sources: the questions (distilled from ponytail's decision ladder), listing every place the change must reach, the never-cut list and the `shortcut:` comment are borrowed from ponytail (github.com/DietrichGebert/ponytail, MIT, skills/ponytail/SKILL.md). When you must look it up, the defensive-code test, deduction before measurement, the test rules and the handback lines are added by this plugin.

@@ -23,7 +23,7 @@ graders:
     input_match: "lean-change"
     min: 1
   - type: regex
-    name: ladder-line
+    name: tests-line
     target: last_message
-    pattern: "Ladder: L[1-7]"
+    pattern: "Tests:|测试："
     match: contains

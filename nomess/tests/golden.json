@@ -2,7 +2,7 @@
  "en": {
   ".claude/rules/nomess/009ec578.md": "44c1bc9170ae49682bfe8b28e597de7f97722a2f954b13fddfd8c65489a31e66",
   ".gitignore": "50692927ff96d0068ec5bc90a5f2c9cddbcc17967fd00f3fb01258d7939680ea",
-  "docs/design.md": "93fb8f5ae6b0c708e37900806d02f9575fac42169d5ce88763a17a00d5d386b2",
+  "docs/design.md": "978848cdb65e2b14493e5b9910638d5737abaf28e1a726ea8921d0ea5aeeff43",
   "docs/lessons/core.md": "1d9aa12e7a4d51c719d3caa8d8d642748faa943de51aad2fc6aa8a539190eac6",
   "docs/plans/archive/old.md": "1813eec4d42596b976b34bbf8f2dc0b1bbd331421f6401a93b8e26e74a2c88f0",
   "docs/plans/new.md": "9010f336e5c216664e88442198a34749b6b8b756b7f18be45a940957a9c8a2f7",
@@ -20,7 +20,7 @@
  "zh-CN": {
   ".claude/rules/nomess/009ec578.md": "ad0042a2766f3f966abd7ff255b06c91bd11bde83a8a561f91c675235605426a",
   ".gitignore": "50692927ff96d0068ec5bc90a5f2c9cddbcc17967fd00f3fb01258d7939680ea",
-  "docs/design.md": "509e5eca2b0eb07119ef285467c282dad1d6d41c436ff8fff6b77fcefae3df64",
+  "docs/design.md": "fded0a1456556f5158d3326ce45c1299c1e8a5e47993435f41d9ec9bf58ccb14",
   "docs/lessons/core.md": "6869ec845b816160e785e88e28daec4ae480a9f87b42e960a2b077929c59ef42",
   "docs/plans/archive/old.md": "3d41a1369d5e168afcf1c1bd87929e6697df0fbd1f7c248fd91bd731d8a6fd28",
   "docs/plans/new.md": "5826ad3a82d057a3cacb435a62f3a579fcf1470f3d62ec54629454fa9a8dcfd2",

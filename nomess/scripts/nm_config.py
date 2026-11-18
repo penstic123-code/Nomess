@@ -134,7 +134,7 @@ DEFAULTS = {
         # <<< P24
     },
     "systems": {"*": []},
-    "docgen": {"*": {"file": None, "map": None, "cmd": None, "py": None, "builtin": None, "timeout": None, "dir": None}},
+    "docgen": {"*": {"file": None, "map": None, "cmd": None, "builtin": None, "timeout": None, "dir": None}},
     "map": {"index_tokens": 1500, "page_tokens": 8000,
             "*": {"title": None, "columns": None, "glob": None, "regex": None,  # 前四个必填,parse 查
                   "file_col": False, "misses": None, "hotspot": None, "may_be_empty": False}},
@@ -143,12 +143,10 @@ DEFAULTS = {
     "review": {"level": None, "cmd": []},  # level None = 跟 size
     "lessons_dir": "docs/lessons",
     "lessons_remind": 10,
-    "suggest": {"window_days": 30, "parallel_branches": 2, "overlap_files": 2, "inbox_stale_days": 30,
-                "systems_medium": 4, "systems_large": 8, "down_window_days": 90},  # 或 false
 }
 ITEM_KEYS = {
     "check.rules": ("id", "level", "what", "why", "glob", "forbid", "require", "cmd", "timeout"),
-    "scopes": ("paths", "why", "checks", "smells", "level", "review", "off"),
+    "scopes": ("paths", "why", "checks", "smells", "off"),
     "allow": ("rule", "file", "from", "to", "reason"),
 }
 MAP_BUDGETS = ("index_tokens", "page_tokens")
@@ -212,11 +210,6 @@ def _validate(cfg, path):
                 not all(isinstance(ch[x], list) and all(isinstance(i, str) and i in file_ids for i in ch[x]) for x in ch) or \
                 set(ch.get("add", [])) & set(ch.get("remove", [])):
             _bad(path, w + ".checks", ch)
-        lv = s.get("level", {})
-        if not isinstance(lv, dict) or not all(i in file_ids and c in ("red", "yellow") for i, c in lv.items()):
-            _bad(path, w + ".level", lv)
-        if "review" in s and s["review"] not in REVIEW_LEVELS:
-            _bad(path, w + ".review", s["review"])
         if "off" in s and not isinstance(s["off"], bool):
             _bad(path, w + ".off", s["off"])
         if "smells" in s:
@@ -275,7 +268,7 @@ def _merge(d, c):
 
 
 def expanded(cfg):
-    """整份展开缺省值后的配置(纯函数):check.builtin、review.level 没写时跟 size;suggest: false 保留。B2 和 Effective 用它。"""
+    """整份展开缺省值后的配置(纯函数):check.builtin、review.level 没写时跟 size。B2 和 Effective 用它。"""
     e = _merge(DEFAULTS, cfg)
     for name, spec in e["map"].items():  # 抽取表补可选键的缺省(map 段只有这一层的条目样子会展开)
         if name not in MAP_BUDGETS:
@@ -297,13 +290,10 @@ def _specificity(g):
 def _scope_keys(s):
     """一条 scope 写了哪些键(合并冲突和 B2 都按这个粒度)-> {键: 值}。"""
     out = {}
-    for x in ("off", "review"):
-        if x in s:
-            out[x] = s[x]
+    if "off" in s:
+        out["off"] = s["off"]
     for k, v in s.get("smells", {}).items():
         out["smells." + k] = v
-    for i, c in s.get("level", {}).items():
-        out["level." + i] = c
     for x in ("add", "remove"):
         for i in s.get("checks", {}).get(x, []):
             out["checks." + i] = x
@@ -311,7 +301,7 @@ def _scope_keys(s):
 
 
 class Effective:
-    """按文件取有效配置的唯一入口:eff = Effective(cfg);eff(path) -> {off, checks, smells, level, review};eff.cfg = expanded(cfg)。
+    """按文件取有效配置的唯一入口:eff = Effective(cfg);eff(path) -> {off, checks, smells};eff.cfg = expanded(cfg)。
     叠加顺序:内置缺省 -> size 缺省 -> 顶层显式 -> 内置测试 scope -> 命中的用户 scopes(从最不具体到最具体逐键覆盖,不看条目先后)。
     两条一样具体、命中同一文件、写了同一个键 -> 退出 2。"""
 
@@ -319,7 +309,7 @@ class Effective:
         self.cfg = c = expanded(cfg)
         ids = {r["id"] for r in c["check"]["rules"] if "cmd" not in r}
         self._base = {"off": False, "checks": frozenset({i for i in c["check"]["builtin"] if BUILTIN[i] == "file"} | ids),
-                      "smells": dict(c["smells"]), "level": {}, "review": c["review"]["level"]}
+                      "smells": dict(c["smells"])}
         self._test = pathglob.matcher(TEST_GLOBS)
         self._scopes = [(s, [(pathglob.compile(g), _specificity(g)) for g in s["paths"]]) for s in c["scopes"]]
         self._memo = {}
@@ -340,17 +330,15 @@ class Effective:
                 both = set(_scope_keys(sa)) & set(_scope_keys(sb))
                 if both:
                     raise ValueError(t("SCOPE_TIE", sa["why"], sb["why"], path, sorted(both)[0]))
-        e = dict(self._base, checks=set(self._base["checks"]), smells=dict(self._base["smells"]), level={})
+        e = dict(self._base, checks=set(self._base["checks"]), smells=dict(self._base["smells"]))
         if self._test(path):
             e["checks"] -= set(TEST_REMOVE)
         for _, s in hits:
             e["checks"] |= set(s.get("checks", {}).get("add", []))
             e["checks"] -= set(s.get("checks", {}).get("remove", []))
             e["smells"].update(s.get("smells", {}))
-            e["level"].update(s.get("level", {}))
-            for x in ("review", "off"):
-                if x in s:
-                    e[x] = s[x]
+            if "off" in s:
+                e["off"] = s["off"]
         e["checks"] = frozenset() if e["off"] else frozenset(e["checks"])
         self._memo[path] = e
         return e
@@ -447,8 +435,8 @@ def _by_id(old, new):
 
 
 # 只写一边也不会变松的键值:新加最严的、删掉最松的
-_STRICTEST = lambda k, v: (k.startswith("checks.") and v == "add") or (k.startswith("level.") and v == "red") or (k == "review" and v == "strict") or (k == "off" and v is False)  # noqa: E731
-_LOOSEST = lambda k, v: (k.startswith("checks.") and v == "remove") or (k.startswith("level.") and v == "yellow") or (k == "review" and v == "off") or (k == "off" and v is True)  # noqa: E731
+_STRICTEST = lambda k, v: (k.startswith("checks.") and v == "add") or (k == "off" and v is False)  # noqa: E731
+_LOOSEST = lambda k, v: (k.startswith("checks.") and v == "remove") or (k == "off" and v is True)  # noqa: E731
 
 
 def _scopes(old, new):
@@ -460,7 +448,6 @@ def _scopes(old, new):
         return m
     a, b = by_glob(old), by_glob(new)
     out = ["+" + g for g in sorted(set(b) - set(a))] + ["-" + g for g in sorted(set(a) - set(b))]
-    rank = REVIEW_LEVELS.index
     for g in sorted(set(a) & set(b)):
         for k in sorted(set(a[g]) | set(b[g])):
             if k in a[g] and k in b[g]:
