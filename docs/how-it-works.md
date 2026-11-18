@@ -2,115 +2,143 @@
 
 [简体中文](how-it-works.zh-CN.md)
 
-This is a tour of what each part of nomess does, why it is built the way it is, and how it works underneath. For installation and commands, see the [README](../README.md).
+nomess is a Claude Code plugin that keeps a shared codebase maintainable and cuts rework as multiple AI agents change it over time. It has six parts. Agents investigate before writing code. A workflow puts design before delegation, and a commit gate enforces project rules. The other parts are a system map generated from code, memory and lessons, path-scoped rules, and code smell detection. The commit checks run as Python scripts in Git hooks, with zero model calls or token use. The plugin requires only Python 3.9 and Git.
 
-## The problem
+## What day-to-day use looks like
 
-One AI changing code is manageable. Several AIs changing the same repository for weeks is how codebases quietly rot. The reasons are concrete: each agent sees only its own task. It doesn't know that another agent wrote the same helper three days ago, that saves are supposed to go through one module only, or what went wrong last week. So a second entry point appears for the same job, the same logic gets pasted into a third file, and a bug fix lands as a special case at the symptom instead of at the cause.
+After installing the plugin, run `/nomess:init` in an interactive Claude Code session for your project. Choose the project size, documentation language, and main branch, then set up the commit checks. Edit, stage, and commit as usual. If an agent copies a long enough block of validation code into another file, the commit stops. The message shows where both copies are:
 
-Each step looks reasonable on its own. Together they add up to a mess. Rework comes from the same place: a change collides with another system, and nobody notices until merge time or runtime.
+```text
+nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-58 repeats src/validate.py lines 10-26 (108 tokens, identical); details: nomess check --red
+```
 
-nomess takes a simple approach. Write the project's rules down. Let scripts check the mechanical ones on every commit. Leave the rest to a workflow and to review. Hand agents what the project has already learned, at the moment they need it.
+The agent can read both locations, make the import flow call the existing validator, then stage and commit again. Passing checks are usually silent. Commands like `/nomess:…` go into Claude Code. Commands like `nomess …` run the script. In your own terminal, you can also run `python <plugin install path>/scripts/nomess.py` with the same arguments.
 
-## Design principles
+## 1. Write less code by checking first
 
-A few ideas run through everything:
+Suppose two upload entry points both store a blank filename as an empty string. An agent sees an error from one entry point and adds a check there. A third entry point can bring the same bug back. `lean-change` asks the agent to find the callers and trace the data to see which shared step should validate it.
 
-- **If a script can check it, don't rely on the AI remembering it.** Prompts get ignored and get compressed away in long sessions; a git hook runs on every commit. The firmest parts of nomess are scripts, not prose.
-- **Hooks cost zero tokens.** Every check is a Python script that never calls a model. A commit takes a second or two longer and costs nothing.
-- **Only block what is new.** Problems already in the codebase are recorded in a baseline, so you don't have to pay off old debt all at once. Only new and worsening problems block a commit.
-- **Everything is markdown and JSON.** Lessons, memory, the system map and configuration are plain files you can read, edit and version. No database, no background service, no network.
-- **Small projects stay light.** A one-person, one-agent project gets the three most certain checks and little else. More switches on as the project grows.
+`lean-change` is a skill, a set of instructions Claude Code can load for relevant tasks. It loads when you add a feature, fix a bug, refactor, or choose a dependency. Describe the task as usual. The agent finds the callers, data, configuration, and documentation the change touches, reads the files it will edit, and runs `nomess lessons find <路径或关键词>` to look up to three relevant lessons.
 
-The plugin needs only Python 3.9 and git, and behaves the same on Windows, macOS and Linux.
+The skill asks a series of questions in order. Do we need this feature? Does the repository already have it? Can the standard library or an installed dependency handle it? For protocols, concurrency, or unfamiliar third-party APIs, consult reliable sources first. If those options fall short, write enough code to solve the problem. When handing off the change, the agent reports where it found a solution and how it verified the change.
 
-## The six parts
+That sequence gives the agent more to work with than “write as little code as possible.” Moving validation to the shared layer might mean changing two call sites, and both entry points then use the same logic. Optimizing for a smaller diff can leave the check in the wrong place.
 
-### ① Write less code, look before you write
+## 2. Workflow and commit gate
 
-A skill (`lean-change`) loads before the AI writes code, fixes a bug or designs something. It walks a decision ladder: can this be avoided altogether? Is there already a function or convention in the repo? Does the standard library or a mature open-source project already do it? Only then write it yourself, and write the smallest complete version. When unsure, check the official docs or an existing implementation first and note the source.
+Suppose you add a field to a save file. One agent changes the write format while another adds a default when loading. Both changes can pass their own tests, yet together they can overwrite a value from an older save. `workflow` coordinates changes where agents need to agree on behavior up front. The commit gate handles checks such as catching a call that the project forbids in a particular module.
 
-It comes with a review checklist for diffs: bugs, over-engineering, patch-style fixes, duplication and scatter, coupling, out-of-scope edits, wrongly removed validation. Every finding must cite a file and line, and the reviewer re-reads that line before reporting it.
+Claude loads `workflow` when it plans, delegates, reviews, or merges work. Small edits to comments or docs can go straight in. A self-contained fix uses a lightweight workflow. Changes to interfaces, save formats, execution order, or data ownership use the full workflow. Decide who reads, who writes, and when writes happen, then review the design. Before delegating, have a subagent that missed the discussion read the brief and flag anything it would need to know. Each parallel task gets its own Git worktree, a separate working directory for the same repository. Use `/nomess:review` to manually review committed changes.
 
-### ② A workflow that prevents mess
+Git runs the gate. `pre-commit` runs before Git records a regular commit. `pre-merge-commit` runs before Git creates an automatic merge commit. The script reads the files, configuration, and baseline staged for commit and compares them with the tree at `HEAD`. If you use `git add -p` to stage half a change, built-in checks use the file version containing just that half. Project-defined `cmd` checks read from disk. If a tracked file has unstaged changes, the hook skips the command and tells you to run it in CI.
 
-A second skill (`workflow`) loads when the AI plans, dispatches work or merges. Its core is sorting changes into three tiers:
+Project rules live in `check.rules`. `forbid` looks for banned patterns. `require` checks that files contain a required pattern. `cmd` uses the exit code of a project command. Red findings block the commit. Yellow findings are there for people to review. If a file needs an exception, record the rule, file, and reason in the top-level `allow`. New exceptions appear in the material reviewers receive.
 
-- **Direct edit:** comments, docs, a few lines of data. Do it yourself, no review.
-- **Light:** a single-point fix in one file with no behaviour change. Hand it to a subagent, review the diff once.
-- **Full:** anything that crosses systems, or changes a save format or a public interface. Eight steps: plan → review the plan → trial read → dispatch → write code → hand back → review the code → merge.
+Since Git runs the checks, they also run when someone commits from a terminal, with no model calls. A person can use `git commit --no-verify` in an emergency. Before common shell commands run, the Claude Code plugin hook blocks agents from using that option or changing `core.hooksPath` to bypass checks. Teams can also run `nomess check --ci --base <可信提交>` in CI to compare `HEAD` with the PR’s target commit. If the project deliberately relaxes a rule, a person approves the change, adds the `nomess-loosen` label to the PR, and configures CI to pass `--allow-loosen` when that label is present.
 
-The interesting step in the full tier is the trial read. Once a plan is written, a cheap model reads it and lists only the questions it would still have to ask. Any question means the plan hasn't made all its decisions yet. Fill the gap and read again, and dispatch only when no questions remain. The agent writing code then gets a brief it can follow without making choices of its own.
+## 3. System map and automatically updated docs
 
-If an agent finds mid-task that the plan doesn't match reality, it stops and hands back, naming the premise that failed. The fix goes into the plan, not into a workaround in the code.
+Before removing `billing`, you want to know which modules still import it. A hand-drawn architecture diagram can explain why the system is split up that way. Six months later, it can be hard to tell from that diagram who still calls what. `docs/system-map/index.md` gives you a starting point generated from the code. Larger projects also get file, dependency, and custom extraction tables.
 
-**The commit gate** is the hard core of this part. `/nomess:init` installs two native git hooks, `pre-commit` and `pre-merge-commit`. Native git hooks rather than Claude Code tool hooks, because git doesn't care who is committing: an AI, a human in a terminal and an IDE button all go through the same check.
+Run `nomess map` to rebuild the system map manually. The script starts with Git’s file list and groups files using the `systems` configuration. By default, it groups them by top-level source directory. It turns imports that resolve to files in the repository into dependency edges, then rolls them up to subsystem dependencies. It extracts Python imports from the syntax tree and approximates imports in some other languages using text patterns. Projects can also define regular expressions in `map` to extract things that follow a consistent convention. For example, calls like `EMIT("order.paid")` can feed an event table. Dynamically constructed event names fall outside that table’s coverage.
 
-The hook checks the tree that is about to be committed, not your working directory. It takes the staged tree from `git write-tree` and reads the config and baseline and runs the detectors on that tree. Unstaged drafts don't affect the result, and with `git add -p` only the staged half is checked. On the main branch, generated files such as the system map are refreshed inside the same commit: nomess layers the refreshed content onto the candidate tree, checks it all together, and once everything passes writes those exact checked bytes into the index. What was checked is always what gets committed.
+To insert an event table into a hand-written document, register a generated section named `events` in `docgen` and add these two markers to the document:
 
-In a hurry, `git commit --no-verify` skips the hook. An AI that tries the same trick is stopped by a Claude Code hook that splits the command by shell rules and recognises `--no-verify`, `-n` and attempts to change `core.hooksPath`.
+```markdown
+<!-- GEN:events BEGIN -->
+<!-- GEN:events END -->
+```
 
-### ③ The system map and self-updating docs
+`nomess docgen` replaces only the content between the markers. Eligible regular commits on the main branch automatically refresh the system map, rule files, and document sections that can be generated from the staged snapshot. The hook adds the generated changes to the proposed commit for checking and stages them for that commit only after the checks pass. It skips generated files with unstaged edits. `cmd` and `py` generators run on manual refresh. The automatic merge hook only checks. Generated files on feature branches can lag behind, so run `nomess refresh` when you need to update them.
 
-nomess generates a system map from the source code in `docs/system-map/`: which subsystems exist, who depends on whom, and which files are depended on most. Python imports are read from the syntax tree, so an `import` inside a string or comment isn't counted. Other languages are scanned with regular expressions.
+People document design trade-offs and pitfalls they’ve encountered. The script rebuilds the inventories it can get from the code. Change an import and the next refresh updates the dependency map.
 
-Design documents can contain generated sections, fenced by two marker lines, whose contents come from a script. Every commit on the main branch refreshes them, so docs and code stay in step within the same commit. Broken links and stale generated sections show up in the checks.
+## 4. Memory and lessons
 
-The system map is a map of what exists today, meant for the AI: before planning a change, it shows which subsystems the change will touch. People read design documents such as `docs/overview.md`, which explain intent and reasoning. nomess doesn't write those for you, but it points out where they no longer match the code.
+After you fix an incident, Git can show which lines changed. It’s harder for the next person to learn why adding retries to checkout requests caused duplicate charges. Keep that information in the repository so people can look it up alongside the code.
 
-### ④ Memory and lessons
+Record a lesson with `/nomess:lesson "结算重试必须复用原请求的幂等键"`. The plugin gives it a title and records when to look it up, what to do, why it matters, and what evidence supports it. The script dates the entry and writes it to `docs/lessons/inbox.md`. A matching title updates the existing entry. Earlier wording stays available in Git history. Entries that haven’t been checked against the code are marked unverified. `lessons find` searches these entries by path and keyword. Including `src/billing/` and “retry” in the entry makes it easier to find than a general note about checkout pitfalls.
 
-Lessons learned the hard way are recorded with `/nomess:lesson` and land in `docs/lessons/inbox.md`. Each has a title, a one-line summary and a body, and can be tagged with the paths it applies to.
+As lessons accumulate, run `/nomess:dream`. It checks the lesson collection and, when it can locate it, the current project’s Claude Code memory directory. It looks for duplicate titles, broken links, and pages over budget, then checks the facts in its proposal against the code and Git history. After reading the proposal, run `/nomess:dream execute` to apply it. Use `execute strike 2 5` to drop items 2 and 5. The cleanup merges duplicates, removes outdated guidance, and proposes turning lessons that keep coming up into rules. It verifies the result and leaves a record in repositories where it can commit.
 
-Every so often, `/nomess:dream` tidies the inbox and memory: it merges duplicates, drops what's outdated, and turns verified lessons into rules. It proposes first. Once you confirm, it does everything in one go and commits, and `git revert` undoes it if you don't like the result. A run costs about 95,000 tokens, so it only runs when you ask.
+These notes are short, plain Markdown files. You can review the diffs and carry the notes across branches. For a question like “Which lesson should I read before changing checkout retries?”, a path and a keyword narrow the search enough. There’s no vector database to maintain. A lesson phrased with different words can slip past the search.
 
-Why not a vector store or a knowledge graph? The data doesn't call for one. A project has tens to a few hundred lessons and memories; organised by directory with an index, they're easy to find. Vector search would add a dependency, storage you can't read, and no clear answer to "why did it find this one?" Markdown files open in any editor, live in git, and show up in code review.
+## 5. Path-scoped rules
 
-### ⑤ Path-scoped rules
+“Reuse the original idempotency key when retrying checkout” matters in `src/billing/`. An agent changing only the homepage styles has little use for it, and reading it takes up context. If every lesson goes into the project’s main instructions, the rules that apply everywhere get harder to find.
 
-Verified lessons become `.claude/rules/nomess/*.md` files, each starting with the paths it applies to. Claude Code loads a rule only when the AI reads a file under a matching path, so rules don't sit in context or cost tokens the rest of the time.
+`dream` can propose promoting a verified lesson that applies repeatedly to a path-scoped rule. You can also write one in the pitfalls section of a subsystem’s documentation page. The source entry needs a verified status, path patterns, and a one-sentence rule. Drafts in `inbox.md` are skipped. Run `nomess rules` to group entries with the same set of paths into a single file under `.claude/rules/nomess/`. The filename comes from a hash of those paths. The `paths` field in the header tells Claude Code when to load the rule:
 
-The effect: when the AI opens a file under `src/save/`, it sees "saves go through save.py only" or "a save-format change needs a migration" — rules the project paid for with past mistakes — without anyone copying them into every brief.
+```yaml
+---
+paths:
+  - "src/billing/**"
+---
+```
 
-### ⑥ Mess detection
+Claude Code loads the rule when it reads a matching file. If all you have is a few lines of `grep` output, open the file to bring the rule into context. Each rule links to its source entry so you can read the full reasoning when the short version isn’t enough.
 
-These are the built-in detectors that run inside the commit gate, about a dozen of them, all scripts, no AI.
+Path-scoped rules work well for conventions that require judgment, such as choosing which request’s key to reuse on a retry. A requirement like “only this module may call the low-level write function in billing code” can go into the commit checks. The script applies the same condition every time.
 
-**Copy-paste (D1).** Code is split into tokens with whitespace and comments removed. Every run of 25 tokens is hashed, and the winnowing algorithm picks representative fingerprints. This is the classic plagiarism-detection method, and it guarantees that any duplicate of 50 tokens or more is found. When two files share a run of fingerprints, the match is extended in both directions to find the full duplicated range. Exact copies are red; copies with renamed variables are yellow, because fingerprints are computed after identifiers are replaced with placeholders, which also catches renamed clones. A snippet that appears in more than ten files is treated as boilerplate and no longer reported.
+## 6. Code smell detection and the ratchet
 
-**One entry point per job (D4).** The config states "this is done only here", for example "saves go only through `save.py`". The same pattern in any other file is reported.
+An old repository might already have three copies of a block of code. If installing a tool means cleaning them all up, even a small bug fix has to wait. If the tool ignores duplication entirely, a fourth or fifth copy can slip in. During setup, nomess runs `nomess check --freeze` to record existing findings in `.nomess-baseline.json`. It uses that list to tell which problems are new and which have grown. Run `nomess check --rules` for rule descriptions and `nomess check --all` to see existing findings too.
 
-**Between subsystems (A1–A4 and relations).** The config says which paths belong to which subsystem, so every edge in the dependency graph becomes "this subsystem uses that one". The checks: subsystems forming a cycle, a lower layer depending on a higher one, a dependency between two subsystems declared independent, an explicitly forbidden dependency, and data written by more than one subsystem.
+| Check | What the script looks for |
+| --- | --- |
+| D1 Duplicate code | A sufficiently long sequence of identical tokens across files is red. A match found only after normalization is yellow. |
+| P1 Swallowed exceptions | For Python, the script uses the syntax tree to see what an exception handler catches and what it does. Catching all exceptions and doing nothing, for example with `pass`, is red. Swallowing a specific exception or leaving a JS/TS `catch` empty is yellow. |
+| P2, P5 Patch traces | Counts markers like `TODO` and `hack` and looks for names like `_v2` and `_old` in files and definitions. Findings are yellow. |
+| S1, S2 Length | Counts nonblank lines in a file or uses Python’s syntax tree to get the first and last lines of a function. New or worsening findings over the configured limit can be red. |
+| A1 and `arch` architecture constraints | Rolls up imports into a subsystem graph. A cycle made entirely of Python import edges is red. A cycle that depends on approximate import extraction is yellow. Projects can also define constraints such as forbidden dependency directions or a single owner for writes. |
+| C4 Parallel scheduling | Two active tasks that will edit the same file, or a task that starts before a prerequisite has merged, trigger red. Overlap inferred only from wildcard prefixes triggers yellow. |
+| PL-DUP, PL-STALE Documentation | Repeated text across documents and stale paths or subsystem names in unarchived plans are yellow. |
 
-**Parallel packages touching the same files (C4).** In a large project, each package in the schedule lists the files it may change. If an existing file matches two packages that are both in progress, it's red. Overlaps inferred only from a shared path prefix are yellow.
+D1 avoids comparing every file in full with every other file. It removes whitespace and comments it recognizes, then splits the code into tokens. It hashes each sequence of 25 consecutive tokens and picks the smallest hash in each sliding window of 26 hashes as a fingerprint. When two files share a fingerprint, the script goes back to the original token sequences and checks outward in both directions to measure the actual match. One pass keeps the tokens as written. Another normalizes identifiers and literals by type, so renaming variables can still leave a detectable copy. The script skips fingerprints shared by too many files so boilerplate doesn’t slow down every commit.
 
-**Smells.** Swallowed exceptions (P1) are judged from the syntax tree by what the `except` block actually does: only `pass`, or catching everything and logging a line, counts as swallowing; cleaning up and re-raising does not. Hack comments (P2), names like `_v2` or `_old` (P5, usually a sign of old and new versions living side by side), and overlong files and functions (S1, S2) are simple matching and counting.
+The baseline identifies findings by rule ID, original color, path, and characteristics of the finding itself. Line numbers only appear in messages. If a file already has two frozen red P1 findings, a third counts as new. Metrics such as length are compared with their frozen values. Growth counts as a regression once it exceeds the configured tolerance. After fixing old findings, run `nomess check --tighten` to remove entries for resolved findings and lower recorded values. Once that allowance is gone, the check catches the same problem if it comes back. That’s the ratchet.
 
-**Docs.** Duplicated content across documents (PL-DUP) is found with the same fingerprints as copy-paste. A plan that mentions paths or systems that no longer exist (PL-STALE) is flagged as possibly stale.
+B1 prevents hiding findings in the baseline. Hand-editing the file cannot increase an existing rule’s allowance. A first freeze applies only to rules that the baseline hasn’t enabled, that ran in the current check, and that support freezing. The recorded findings must also match the current full scan. B2 catches changes that weaken the checks. It compares both configurations with defaults filled in. Removing checks, raising managed thresholds, lowering the review level, changing the baseline location, or deleting `nomess.json` all trigger it. Freezing lets teams adopt checks without cleaning up the whole repository first. B1 and B2 keep a change from weakening the checks it has to pass.
 
-**The ratchet: things only get better.** At install time every existing problem is recorded in the baseline `.nomess-baseline.json`: which rule, which file, how many. From then on each commit is compared against it. New problems are blocked. Worsening problems are blocked too, such as one more occurrence in the same file or a file that grew longer. Anything already in the baseline passes. Fixed problems are removed from the baseline at the end of a batch and can't come back.
+## How the six parts work together
 
-A ratchet is only useful if nobody can quietly loosen it, so there are two guards. B1 protects the baseline: a commit that adds entries or raises counts is caught. B2 protects the config: turning a check off, raising a threshold, deleting a rule or changing a subsystem's paths all count as loosening. Either kind of change needs a human to put the `nomess-loosen` label on the PR before CI lets it through.
+Suppose checkout and a background recovery job both write to the ledger. After fixing the incident, you use `/nomess:lesson` to record what happened and which two entry points were involved. `dream` verifies the lessons. One says to reuse the original request’s idempotency key on a retry. The agent needs to read the surrounding code to apply it, so it becomes a path-scoped rule for billing. The other says that only the ledger module may call the low-level write function. You can enforce it with a red `forbid` rule and record a justified exception for the file that legitimately writes to the ledger.
 
-Results are cached by file content hash, so unchanged files aren't re-analysed, and a commit only checks the files it touches. False positives are kept down by severity: only the most certain cases are red and block by default; anything that might be a misjudgement is yellow. For a genuine exception, add an `allow` entry with a reason to the config, and review always looks at newly added exceptions.
+Later, someone asks an AI agent to add batch recovery. `lean-change` has it find the existing write entry point first. When it reads the file, the path-scoped rule reminds it to keep the idempotency key. The system map helps it trace the dependency between billing and the ledger. If batch recovery also changes who owns writes, `workflow` has the coordinator decide who writes to the ledger before assigning tasks. Even if the agent overlooks the earlier guidance, the Git hook blocks the commit if a staged file in the restricted paths calls the low-level write function directly.
 
-## Fitting projects of different sizes
+## Choosing a project size and adjusting the defaults
 
-Flexibility comes in four layers, from coarse to fine:
+`size` selects a set of defaults. If it’s just you and one agent at a time, start with `small`. It enables D1, P1, and S1 and uses `light` review. When several agents start working in parallel, `medium` adds A1 and raises review to `standard`. `large` adds C4, PL-DUP, and PL-STALE. It also uses a schedule to track tasks and the files each can edit, and an ownership map to record who is responsible for shared data.
 
-1. **Three sizes.** `size` in `nomess.json` is `small`, `medium` or `large`. It sets which detectors are on by default, which review level applies and which files init creates. Small projects get copy-paste, swallowed exceptions and overlong files, the lightest review, and only the system map's front page. Medium adds subsystem cycle detection and the paged system map. Large adds parallel-package overlap, doc duplication and stale plans, plus a master schedule and an ownership map. Size only sets defaults; anything you set explicitly wins.
-2. **Per-directory strictness.** `scopes` give different settings to different directories: strict in the core, relaxed in tools, no length limits in tests. When a file matches several scopes, the most specific path wins.
-3. **Individual switches and thresholds.** Every detector can be turned on or off, recoloured and tuned on its own.
-4. **Suggested size changes.** nomess looks at recent commit history. Several branches merging in parallel suggests moving up; a long stretch with one person working suggests moving down. The suggestion appears in `nomess status` and the VS Code status bar, and a person decides.
+This configuration keeps the four checks from `medium`, adds a function length check for hand-written payment code, and raises review to `strict` for changes that touch those files:
 
-## Design choices
+```json
+{
+  "format": "nomess/1",
+  "main_branch": "main",
+  "size": "medium",
+  "lang": "en",
+  "check": { "builtin": ["D1", "P1", "S1", "A1"] },
+  "scopes": [
+    {
+      "paths": ["src/payments/**"],
+      "why": "payment changes get a full review",
+      "checks": { "add": ["S2"] },
+      "smells": { "func_lines": 60 },
+      "review": "strict"
+    }
+  ]
+}
+```
 
-**Why native git hooks.** An early version intercepted commit commands with Claude Code tool hooks. That only covered the AI, missed humans committing from a terminal, and meant guessing every shell spelling. Git calls its own hooks on every commit, whoever makes it and however it's made. nomess coexists with husky and the pre-commit framework: it never overwrites someone else's hook and prints a one-line recipe to wire itself in instead.
+An explicit `check.builtin` list takes over from the size preset. `scopes` can add or remove individual file checks by path, adjust severity and thresholds, and set the review level. When several scopes match, more specific paths override settings one at a time. Top-level settings control checks that look at the entire tree, such as A1 and C4.
 
-**Why check the index rather than the working directory.** The index is what gets committed. Check the working directory and you could fix something without staging it, pass the check, and commit the unfixed version.
+`off` turns review off entirely. `light` usually reviews only the combined change and skips docs, configuration, and tests. `standard` also reviews logic changes in individual work packages. `strict` reviews every package. When review is enabled, separate criteria determine whether to require it for changes that use the full workflow, go beyond the brief, or add exceptions. When a change touches multiple directories, the strictest level applies. If the project’s `AGENTS.md` or `CLAUDE.md` already specifies how to check briefs, test, or review, follow the project’s instructions.
 
-**Why only block new problems.** Demanding that all existing problems be fixed first usually means nobody installs the tool. The ratchet leaves old debt where it is, guarantees things don't get worse, and tightens over time.
+`nomess status --suggest` lists the reasons to move up or down a size, such as recent merges and file overlap, the number of subsystems, a backlog of lessons, or a stretch with one author and no parallel merges. A person decides whether to act on the suggestion. To move up, rerun `/nomess:init` and check any explicit list of enabled checks. If moving down disables checks or lowers the review level, follow the project’s approval process for relaxing rules.
 
-**Why the text is short.** The only things always in context are the descriptions of two skills and two subagents, plus the nomess section of `AGENTS.md` (at most 12 lines): about 530 tokens. Everything else loads on demand. The workflow loads when planning, and a directory's rules load when its files are opened.
+## What it doesn’t do
 
-**It isn't a security boundary.** Anyone determined to get around it can type `--no-verify`. nomess guards against not noticing, not against doing it on purpose. To actually hold the line, run `nomess check --ci` in CI. It reads the config and baseline of both commits directly, depends on nothing local, and requires the PR label for any loosening.
+The commit gate enforces working agreements. Permissions and protected CI provide the security boundary. Set up local hooks in each new clone. Fast-forward merges, rebases, and cherry-picks need coverage beyond the local hooks.
+
+The system map can extract inventories from code. The project team writes down why the system is designed that way and what trade-offs it makes. The nomess scripts run locally without network access or telemetry, and commit checks make no model calls. `dream` and review run in a Claude Code session. Custom commands registered in `nomess.json` run as configured.
