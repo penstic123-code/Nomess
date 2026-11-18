@@ -8,7 +8,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Each release has thr
 
 - Review level `off` turns review off entirely, globally or per directory in `scopes`.
 - Rules in the project's `AGENTS.md` or `CLAUDE.md` take precedence over the `workflow` and `lean-change` skills.
-- A guide to how each part works and why it is built that way: `docs/how-it-works.md` (English and Simplified Chinese).
+- README rewritten: each of the six parts explained with an example, how it works and why it is built that way (English and Simplified Chinese).
 - Logo.
 
 ### Changed
