@@ -20,11 +20,12 @@ Below, `nomess.py` means `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/n
 
 | Level | Per package (one package's diff) | Per batch (a batch's combined diff) |
 |---|---|---|
+| `off` | No review | No review |
 | `light` | No review | Review, skipping docs, config, tests |
 | `standard` | Review logic code; no review if only docs, config, templates changed | Review |
 | `strict` | Review all | Review |
 
-Always review at any level: a first line marked `[must-review]` (check this first, before the table); changes outside the brief (even one line); Full-process changes (file or save format, interface, execution timing or data owner); commits that add an `allow` (listed in the must-review section of the review input).
+At `off`, nothing is reviewed, not even the items below (loosening still needs the `nomess-loosen` PR label). Always review at any other level: a first line marked `[must-review]` (check this first, before the table); changes outside the brief (even one line); Full-process changes (file or save format, interface, execution timing or data owner); commits that add an `allow` (listed in the must-review section of the review input).
 
 If no review is due, tell the user "no review under `<level>`" with the reason, and stop.
 

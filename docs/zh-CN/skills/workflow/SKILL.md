@@ -8,6 +8,8 @@ description: >-
 
 下文的 `nomess.py` 指 `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`，在项目根执行；配套文件 `brief-template.md` 和 `merge-steps.md` 也用这个简写。项目大小是 `nomess.json` 里的 `size`（`small` / `medium` / `large`）；它只决定全套这一档带哪些额外步骤（第 2 节），以及检查和审查级别的缺省值。
 
+项目规矩优先：项目的 `AGENTS.md` 或 `CLAUDE.md` 对这里任何一步另有规定（某档走几步、要不要试读、测试怎么写、什么时候审），按项目的来。审查也可以用 `review.level: "off"` 整个关掉，全局或在 `scopes` 里按目录关。
+
 ## 1. 三档
 
 | 档 | 什么改动 | 流程 |

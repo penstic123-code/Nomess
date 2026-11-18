@@ -14,7 +14,7 @@ from messages import t, set_lang
 
 CONFIG_NAME = "nomess.json"
 FORMAT = "nomess/1"
-REVIEW_LEVELS = ("light", "standard", "strict")
+REVIEW_LEVELS = ("off", "light", "standard", "strict")
 
 
 def find_config(start=None):
@@ -448,7 +448,7 @@ def _by_id(old, new):
 
 # 只写一边也不会变松的键值:新加最严的、删掉最松的
 _STRICTEST = lambda k, v: (k.startswith("checks.") and v == "add") or (k.startswith("level.") and v == "red") or (k == "review" and v == "strict") or (k == "off" and v is False)  # noqa: E731
-_LOOSEST = lambda k, v: (k.startswith("checks.") and v == "remove") or (k.startswith("level.") and v == "yellow") or (k == "review" and v == "light") or (k == "off" and v is True)  # noqa: E731
+_LOOSEST = lambda k, v: (k.startswith("checks.") and v == "remove") or (k.startswith("level.") and v == "yellow") or (k == "review" and v == "off") or (k == "off" and v is True)  # noqa: E731
 
 
 def _scopes(old, new):

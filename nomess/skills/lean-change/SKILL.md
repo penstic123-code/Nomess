@@ -50,7 +50,7 @@ How: official docs and specs â†’ source of mature open-source implementations â†
 - Write tests only for edge behavior that is hard to deduce correctly from the code and easy to regress. What reading the code can confirm goes into the handback as "confirmed by reading code: file:line", with no test.
 - One test checks one thing. No timing assertions. Don't test implementation details or cover the same behavior twice.
 - During development run only the tests you changed; run the full suite once before handing back. Whether the logic is right is mostly judged by review.
-- If the project has its own testing rules, follow them.
+- If the project has its own testing rules (in `AGENTS.md`, `CLAUDE.md` or its docs), follow them instead of this section.
 
 ## 6. Debugging
 

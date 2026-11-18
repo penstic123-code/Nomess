@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.svg" width="96" alt="nomess logo"></p>
+
 # nomess
 
 English | [简体中文](README.zh-CN.md)
@@ -9,7 +11,7 @@ English | [简体中文](README.zh-CN.md)
 - **Checks at commit time, zero tokens.** Git hooks (`pre-commit`, `pre-merge-commit`) run your rules (regex rules or your own scripts) plus built-in checks for the cases it can decide for sure (see "Pick a size"). Commits from a human terminal are checked too. Silent when clean; when something new breaks, the commit is blocked with one line.
 - **Agents recall the pitfalls of the folder they touch.** Lessons you record with `/nomess:lesson` can become path-scoped rule files (`.claude/rules/nomess/`; `/nomess:dream` proposes, you approve) that Claude Code loads only when a matching file is opened.
 - **A system map generated from the code.** `docs/system-map/` is refreshed inside the commit on your main branch (`main_branch` in `nomess.json`); on feature branches it can be out of date.
-- **A design-first workflow.** The `workflow` skill loads when Claude plans, dispatches or merges work: three change tiers (full / light / direct), briefs precise enough to hand to a subagent, a trial read before dispatch, three review levels (`light` / `standard` / `strict`).
+- **A design-first workflow.** The `workflow` skill loads when Claude plans, dispatches or merges work: three change tiers (full / light / direct), briefs precise enough to hand to a subagent, a trial read before dispatch, review levels `off` / `light` / `standard` / `strict`. Any step can be overridden by your own rules in `AGENTS.md`.
 - **Lessons and memory you can read, edit and commit.** Plain markdown; `/nomess:dream` tidies them as a proposal you confirm first.
 
 ## Quick start
@@ -150,6 +152,8 @@ No network access, no telemetry, no data collection. **Commands registered in `n
 Sidebar for the docs, check results in the Problems panel, stale-doc count in the status bar. It calls the same script and never calls Claude. Store release is coming; until then build it from source.
 
 ## More
+
+How each part works and why it is designed that way: [docs/how-it-works.md](docs/how-it-works.md).
 
 [Changelog](CHANGELOG.md) · [License: MIT](LICENSE) · Skill texts: [`nomess/skills/`](nomess/skills/) · Chinese translations: [`docs/zh-CN/`](docs/zh-CN/) · Questions and bugs: GitHub Issues at `penstic123-code/Nomess`. A personally maintained project; no response time is promised.
 

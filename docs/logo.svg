@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="nomess quokka">
+  <rect width="128" height="128" rx="28" fill="#f3e4c6"/>
+  <!-- body, sitting upright -->
+  <path d="M64 74 C88 74 98 94 98 112 C98 122 90 128 64 128 C38 128 30 122 30 112 C30 94 40 74 64 74 Z" fill="#8c7562"/>
+  <ellipse cx="64" cy="108" rx="17" ry="18" fill="#cdb497"/>
+  <!-- ears -->
+  <ellipse cx="46" cy="31" rx="7.5" ry="10" transform="rotate(-18 46 31)" fill="#76604f"/>
+  <ellipse cx="82" cy="31" rx="7.5" ry="10" transform="rotate(18 82 31)" fill="#76604f"/>
+  <ellipse cx="46.5" cy="32" rx="3.8" ry="6" transform="rotate(-18 46.5 32)" fill="#c49a86"/>
+  <ellipse cx="81.5" cy="32" rx="3.8" ry="6" transform="rotate(18 81.5 32)" fill="#c49a86"/>
+  <!-- head: wide cheeks, tapering to a snout -->
+  <path d="M64 28 C82 28 95 40 96 55 C97 68 88 77 78 83 C71 87 57 87 50 83 C40 77 31 68 32 55 C33 40 46 28 64 28 Z" fill="#9a8270"/>
+  <!-- muzzle -->
+  <ellipse cx="64" cy="72" rx="15" ry="12" fill="#d8c1a3"/>
+  <!-- eyes, set wide -->
+  <circle cx="49" cy="55" r="3.8" fill="#1d1510"/>
+  <circle cx="79" cy="55" r="3.8" fill="#1d1510"/>
+  <circle cx="50.2" cy="53.8" r="1.2" fill="#fff"/>
+  <circle cx="80.2" cy="53.8" r="1.2" fill="#fff"/>
+  <!-- nose -->
+  <path d="M57.5 64.5 Q64 61.5 70.5 64.5 Q69 71 64 72 Q59 71 57.5 64.5 Z" fill="#1d1510"/>
+  <!-- the quokka smile -->
+  <path d="M64 72 V75.5 M56 75 Q60 81 64 75.5 Q68 81 72 75" fill="none" stroke="#1d1510" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- little hands held at the chest -->
+  <ellipse cx="55" cy="93" rx="5.5" ry="4.2" transform="rotate(-20 55 93)" fill="#6f5a4a"/>
+  <ellipse cx="73" cy="93" rx="5.5" ry="4.2" transform="rotate(20 73 93)" fill="#6f5a4a"/>
+</svg>

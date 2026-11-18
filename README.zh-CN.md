@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.svg" width="96" alt="nomess logo"></p>
+
 # nomess
 
 [English](README.md) | 简体中文
@@ -9,7 +11,7 @@
 - **提交时自动检查，零 token。** git 钩子（`pre-commit`、`pre-merge-commit`）跑你的规则（正则规则或你自己的脚本），再加能确定判断的内置检测（见"选规模"）。人在终端里提交也会检查。没问题不出声；出现新问题就挡下这次提交，只给一行提示。
 - **碰到哪个目录，代理就想起那个目录的坑。** 用 `/nomess:lesson` 记下的教训可以变成按路径加载的规则文件（`.claude/rules/nomess/`；由 `/nomess:dream` 提议、你批准），Claude Code 只在打开匹配的文件时才加载。
 - **从代码生成的系统图。** `docs/system-map/` 在主分支（`nomess.json` 的 `main_branch`）的提交里一起刷新；功能分支上可能过时。
-- **先设计后派活的流程。** Claude 规划、派活或合并时，`workflow` skill 加载：改动分三档（全套 / 轻流程 / 直接改），简报细到能直接交给子代理，派活前先试读，审查分三档（`light` / `standard` / `strict`）。
+- **先设计后派活的流程。** Claude 规划、派活或合并时，`workflow` skill 加载：改动分三档（全套 / 轻流程 / 直接改），简报细到能直接交给子代理，派活前先试读，审查分 `off` / `light` / `standard` / `strict` 四档。流程里任何一步都可以在 `AGENTS.md` 里用项目自己的规矩改掉。
 - **能读、能改、能进 git 的教训和记忆。** 都是 markdown；`/nomess:dream` 先出提案，你确认后才整理。
 
 ## 30 秒上手
@@ -150,6 +152,8 @@ Claude Code 2.1.277 或更新，Python 3.9+，git 2.24+。适合中小仓库：�
 侧栏看文档，检查结果显示在问题面板，状态栏显示过时文档数。它调用同一个脚本，从不调用 Claude。商店版即将上架，在那之前可从源码构建。
 
 ## 更多
+
+各部分怎么工作、为什么这样设计：[docs/how-it-works.zh-CN.md](docs/how-it-works.zh-CN.md)。
 
 [更新记录](CHANGELOG.md) · [许可证：MIT](LICENSE) · skill 原文：[`nomess/skills/`](nomess/skills/) · 中文译文：[`docs/zh-CN/`](docs/zh-CN/) · 问题和 bug：GitHub Issues，仓库 `penstic123-code/Nomess`。个人维护的项目，不承诺响应时间。
 

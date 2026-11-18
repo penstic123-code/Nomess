@@ -39,7 +39,7 @@
 | `systems` | 子系统名 → 非空的路径 glob 列表(glob 语义同规则文件,见 rules);没填就按源文件所在的顶层目录划(隐藏目录、只有文档的目录不算) | `nomess map`、`nomess rules`、说明页检查 |
 | `memory` | 预算覆盖(见下) | `nomess check --memory` |
 | `rules.file_tokens` | 每份规则文件的预算(估算 token),缺省 400 | `nomess rules`、check |
-| `review.level` | `light` / `standard` / `strict`,缺省跟 `size`,别的值报错 | workflow、`/nomess:review` |
+| `review.level` | `off` / `light` / `standard` / `strict`(`off` 完全不审),缺省跟 `size`,别的值报错 | workflow、`/nomess:review` |
 | `review.cmd` | 外部审查命令(列表) | `/nomess:review` |
 | `lessons_dir` | 缺省 `docs/lessons` | `nomess lessons` |
 
@@ -126,7 +126,7 @@
 - `expanded(cfg)`:深合并 `DEFAULTS`;`check.builtin`、`review.level` 没写时取 `SIZE[size]`;`suggest: false` 保留。`DEFAULTS` 同时是合法键表(`"*"` = 名字随用户取的那层的条目样子,只用于认键,不往用户条目里补);列表条目的键在 `ITEM_KEYS`。不认识的键报黄 CFG1(带最近的合法键)。
 - `Effective(cfg)`:`eff(path) -> {"off", "checks"(开着的按文件号:BUILTIN 里 file 类的 builtin 号 + forbid / require 规则的 id,按 scope 依次 add / remove), "smells", "level"(scope 写过的号 → 颜色), "review"}`。scope 合并:只看命中的条目,具体程度 = 命中这个文件的 glob 里最具体的一个(第一个通配符前的字面前缀长度,相同再比字面字符总数),从不具体到具体逐键覆盖,不看先后;两条一样具体、命中同一文件、写了同一个键(`smells.x` / `level.x` / `checks.x` / `review` / `off`)退出 2。内置测试 scope(`TEST_GLOBS`,关 D1 P1 P2 P5 S1 S2)永远排最前。
 - `BUILTIN` 是 `check.builtin` 的词表并标出 file / tree 类;`SIZE` 是三档缺省(小 D1 P1 S1 + light;中加 A1 + standard;大再加 C4 PL-DUP PL-STALE)。
-- `LOOSEN`(B2 判法表,表里没有的键不比):`check.builtin`、`smells.extra_ext`、`arch.independent`、`arch.forbid` 只许增;`arch.layers` 只许增且已有层的相对顺序不变;`check.rules`、`arch.relations` 按 id 删或改都算(level 黄改红除外);`check.baseline`、`systems` 任何改动都算;`smells.*` 阈值变大算;`review.level` 变低算;`map.*` 已有表的 glob / regex / columns 改动、`may_be_empty` 改成 true、删表算;`scopes` 按 glob 比:glob 增删(改名 = 一删一增)算,同一 glob 下两边都有的键变松算,只写一边的键除"新加最严的(checks.add、level red、review strict、off false)/ 删掉最松的(checks.remove、level yellow、review light、off true)"外都算。后四包要加键只在自己的区块里加行。
+- `LOOSEN`(B2 判法表,表里没有的键不比):`check.builtin`、`smells.extra_ext`、`arch.independent`、`arch.forbid` 只许增;`arch.layers` 只许增且已有层的相对顺序不变;`check.rules`、`arch.relations` 按 id 删或改都算(level 黄改红除外);`check.baseline`、`systems` 任何改动都算;`smells.*` 阈值变大算;`review.level` 变低算;`map.*` 已有表的 glob / regex / columns 改动、`may_be_empty` 改成 true、删表算;`scopes` 按 glob 比:glob 增删(改名 = 一删一增)算,同一 glob 下两边都有的键变松算,只写一边的键除"新加最严的(checks.add、level red、review strict、off false)/ 删掉最松的(checks.remove、level yellow、review off、off true)"外都算。后四包要加键只在自己的区块里加行。
 
 ### 提示语和缓存
 

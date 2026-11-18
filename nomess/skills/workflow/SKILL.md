@@ -8,6 +8,8 @@ description: >-
 
 Below, `nomess.py` means `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`, run from the project root; the support files `brief-template.md` and `merge-steps.md` use this short form too. Project size is `size` in `nomess.json` (`small` / `medium` / `large`); it only decides which extra steps the Full tier carries (section 2) and the defaults of checks and review level.
 
+Project rules win: if the project's `AGENTS.md` or `CLAUDE.md` says otherwise about any step here (how many steps a tier has, whether to trial-read, how to test, when to review), follow the project. Review can also be turned off entirely with `review.level: "off"`, globally or per directory in `scopes`.
+
 ## 1. Three tiers
 
 | Tier | What change | Process |
