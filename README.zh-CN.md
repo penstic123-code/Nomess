@@ -74,12 +74,12 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - 交付时说明停在哪一步、用什么验证
 - **解决什么问题**：两个上传入口都把空文件名存成空字符串；只给报错的那个入口补判断，第三个入口一来 bug 又回来
 
-<img src="docs/img/zh/lean-shared-layer.svg" width="720" alt="修在共享层 vs 修在症状处">
+<img src="docs/img/zh/lean-shared-layer.svg" width="520" alt="修在共享层 vs 修在症状处">
 
 - **怎么用**：照常描述任务；代理先找调用者、数据、配置和文档，读要改的文件，再用 `nomess lessons find <路径或关键词>` 查最多三条相关教训
 - **原理**：决策阶梯——有必要做吗？→ 仓库已有吗？→ 标准库或已装依赖能解决吗？→ 协议、并发、陌生第三方接口先查可靠资料 → 前面都不行才写足以解决问题的代码
 
-<img src="docs/img/zh/lean-ladder.svg" width="720" alt="决策阶梯">
+<img src="docs/img/zh/lean-ladder.svg" width="520" alt="决策阶梯">
 
 - **为什么这样设计**：找到共享校验层可能要改两个调用点，但两个入口从此走同一套逻辑；只压缩 diff 反倒容易把判断留在错误的位置
 
@@ -91,7 +91,7 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - 闸门交给 Git：人在终端提交也查，不调用模型
   - 只看这次要提交的内容：`git add -p` 只暂存半个改动，内置检查就按那半个判断
 
-<img src="docs/img/zh/flow-tiers.svg" width="720" alt="三档流程">
+<img src="docs/img/zh/flow-tiers.svg" width="520" alt="三档流程">
 
 - **解决什么问题**
   - 给存档加字段：一个代理改写入格式，另一个给读档补默认值，各自过测试，合起来覆盖旧存档的值
@@ -102,14 +102,14 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - 项目规则写在 `check.rules`：`forbid` 禁止模式，`require` 必须存在的模式，`cmd` 看项目命令退出码；红项挡，黄项供人看
   - 某个文件确需例外：顶层 `allow` 写清规则、文件、理由，新增例外会进审查输入
 
-<img src="docs/img/zh/flow-pipeline.svg" width="720" alt="全套流程八步">
+<img src="docs/img/zh/flow-pipeline.svg" width="520" alt="全套流程八步">
 
 - **原理**
   - `pre-commit` 在普通提交落盘前跑，`pre-merge-commit` 在 Git 自动建合并提交前跑
   - 读暂存区里将要提交的文件、配置和基线，以 `HEAD` 的树为比较起点
   - 项目登记的 `cmd` 检查读磁盘；已跟踪文件有未暂存改动时钩子跳过它，提示交给 CI
 
-<img src="docs/img/zh/flow-gate-tree.svg" width="720" alt="提交闸门检查哪棵树">
+<img src="docs/img/zh/flow-gate-tree.svg" width="520" alt="提交闸门检查哪棵树">
 
 - **为什么这样设计**
   - 检查交给 Git，不靠代理自觉；人应急可用 `git commit --no-verify`，插件钩子拦住代理用它或改 `core.hooksPath` 绕过
@@ -131,7 +131,7 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
 <!-- GEN:events END -->
 ```
 
-<img src="docs/img/zh/map-gen-section.svg" width="720" alt="文档里的生成段">
+<img src="docs/img/zh/map-gen-section.svg" width="520" alt="文档里的生成段">
 
 - **原理**
   - 从 Git 文件清单出发，按 `systems` 配置分组，没配就按源码顶层目录分
@@ -139,7 +139,7 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - `map` 里的正则可抽取统一约定，如把 `EMIT("order.paid")` 汇成事件表；动态拼出的事件名不在视野内
   - 主分支普通提交时，生成结果先叠到候选提交上一起检查，通过才写进这次提交；带未暂存编辑的目标跳过，`cmd` / `py` 生成器留给手动刷新；自动合并的钩子只检查
 
-<img src="docs/img/zh/map-pipeline.svg" width="720" alt="系统图怎么生成">
+<img src="docs/img/zh/map-pipeline.svg" width="520" alt="系统图怎么生成">
 
 - **为什么这样设计**：人写设计取舍和踩过的坑，脚本重算能从代码得到的清单；改了一处导入，不用凭记忆给另一张图补线
 
@@ -156,7 +156,7 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - 适用场景里写上 `src/billing/` 和"重试"，比只写"结算有坑"好找
   - 积多了跑 `/nomess:dream` 出提案，看过后 `/nomess:dream execute` 执行；`execute strike 2 5` 划掉第 2、5 项
 
-<img src="docs/img/zh/lessons-lifecycle.svg" width="720" alt="教训的生命周期">
+<img src="docs/img/zh/lessons-lifecycle.svg" width="520" alt="教训的生命周期">
 
 - **原理**
   - 插件整理出标题、何时该查、怎么做、为什么、依据；脚本加日期写进 `inbox.md`；同标题更新原条目，旧说法在 Git 历史里
@@ -165,7 +165,7 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - 执行时合并重复、清掉过期说法、提议把反复有用的教训变成规则，执行后校验结果
 - **为什么这样设计**：对"改结算重试前查哪条"这种问题，路径加关键词已经能把范围缩得很小，不值得多维护一套向量库；代价是用词不同的同义教训可能搜不到
 
-<img src="docs/img/zh/lessons-find.svg" width="720" alt="按路径和关键词查">
+<img src="docs/img/zh/lessons-find.svg" width="520" alt="按路径和关键词查">
 
 ## <img src="docs/img/icons/rules.svg" width="34" align="absmiddle"> 5. 按路径加载的规则
 
@@ -176,7 +176,7 @@ nomess: 1 条新红项,首条 src/import.py:42 D1 src/import.py 第 42-58 行和
   - 只收已核实的条目，`inbox.md` 里的草稿不生成
 - **解决什么问题**："结算重试沿用原幂等键"对 `src/billing/` 很重要，只改首页样式的代理读到它只是多占上下文；全塞进入口，真正通用的规矩也难找
 
-<img src="docs/img/zh/rules-context.svg" width="720" alt="上下文占用对比">
+<img src="docs/img/zh/rules-context.svg" width="520" alt="上下文占用对比">
 
 - **怎么用**
   - `dream` 提议把反复适用、已核实的教训升成路径规则，或者在系统说明页的"坑"里写一条
@@ -193,7 +193,7 @@ paths:
 ---
 ```
 
-<img src="docs/img/zh/rules-paths.svg" width="720" alt="按路径加载规则">
+<img src="docs/img/zh/rules-paths.svg" width="520" alt="按路径加载规则">
 
 - **为什么这样设计**：路径规则管要判断的约定（这次重试沿用哪个请求的键）；能判定的限制（结算里只许某模块调底层写入）交给提交检查，每次按同一条件执行
 
@@ -220,26 +220,26 @@ paths:
 | C4 并行排期 | 两个在做的任务确定改同一文件，或开工时前置任务还没合入，报红；只从通配符前缀推测重叠报黄 |
 | PL-DUP、PL-STALE 文档 | 文档间重复的文字、未归档方案里失效的路径或子系统名，报黄 |
 
-<img src="docs/img/zh/smell-arch.svg" width="720" alt="子系统依赖约束">
+<img src="docs/img/zh/smell-arch.svg" width="520" alt="子系统依赖约束">
 
 - **原理**
   - D1：去掉空白和能识别的注释、切成词元；每 25 个连续词元算一个哈希，每组 26 个哈希里挑最小值当指纹；撞上指纹就回到原词元向两端扩，量出实际重复多长
   - D1 一路保留原词元、一路把标识符和字面量按类型归一，改了变量名的副本也能发现；太多文件都有的常见指纹跳过
 
-<img src="docs/img/zh/smell-winnow.svg" width="720" alt="复制粘贴指纹">
+<img src="docs/img/zh/smell-winnow.svg" width="520" alt="复制粘贴指纹">
 
   - 基线按规则号、原始颜色、路径和问题自身特征认人，行号只用于提示；某文件冻结了两处 P1 红项，多出第三处才算新的
   - 长度类指标和冻结值比，增长超出容忍幅度才算恶化
   - B1：已有规则的额度不能靠手改文件增加；首次冻结只给基准里还没启用、这次确实执行过且允许冻结的规则，记录要能在本次全量扫描里对上
   - B2：比较两边展开默认值后的配置；删检查、抬高受管阈值、降审查档、换基线位置、删 `nomess.json` 都会触发
 
-<img src="docs/img/zh/smell-ratchet.svg" width="720" alt="棘轮">
+<img src="docs/img/zh/smell-ratchet.svg" width="520" alt="棘轮">
 
 - **为什么这样设计**：冻结让接入成本可接受，B1 和 B2 让同一份改动不能顺手把防线挪走
 
 ## <img src="docs/img/icons/together.svg" width="34" align="absmiddle"> 六个部分怎么配合
 
-<img src="docs/img/zh/together.svg" width="720" alt="六个部分怎么配合">
+<img src="docs/img/zh/together.svg" width="520" alt="六个部分怎么配合">
 
 - 结算和后台补偿各写了一次账本；修完故障，用 `/nomess:lesson` 记下原因和两个入口
 - `dream` 核对后分两路留下：
@@ -251,7 +251,7 @@ paths:
 
 ## <img src="docs/img/icons/sizes.svg" width="34" align="absmiddle"> 适配大小项目和怎么自己调
 
-<img src="docs/img/zh/sizes.svg" width="720" alt="三级规模">
+<img src="docs/img/zh/sizes.svg" width="520" alt="三级规模">
 
 - `size` 给一组缺省值：
   - `small`：一个人、一次一个代理；开 D1、P1、S1，审查 `light`

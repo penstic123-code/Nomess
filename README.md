@@ -74,12 +74,12 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - At hand-off the agent reports where it found a solution and how it verified the change
 - **Problem it solves**: two upload entry points both store a blank filename as an empty string; patch the one that errored and a third entry point brings the bug back
 
-<img src="docs/img/en/lean-shared-layer.svg" width="720" alt="Fix in the shared layer vs at the symptom">
+<img src="docs/img/en/lean-shared-layer.svg" width="520" alt="Fix in the shared layer vs at the symptom">
 
 - **How to use it**: describe the task as usual; the agent finds the callers, data, configuration and docs the change touches, reads the files it will edit, and runs `nomess lessons find <path or keyword>` for up to three relevant lessons
 - **How it works**: the decision ladder: do we need it? → does the repo already have it? → can the standard library or an installed dependency handle it? → for protocols, concurrency or unfamiliar third-party APIs, consult reliable sources → only then write enough code to solve the problem
 
-<img src="docs/img/en/lean-ladder.svg" width="720" alt="Decision ladder">
+<img src="docs/img/en/lean-ladder.svg" width="520" alt="Decision ladder">
 
 - **Why this design**: moving validation to the shared layer might mean changing two call sites, but both entry points then use the same logic; optimizing for a smaller diff can leave the check in the wrong place
 
@@ -91,7 +91,7 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - Git runs the gate: it also runs when a person commits from a terminal, with no model calls
   - It checks only what is being committed: stage half a change with `git add -p` and the built-in checks judge that half
 
-<img src="docs/img/en/flow-tiers.svg" width="720" alt="Three workflow tiers">
+<img src="docs/img/en/flow-tiers.svg" width="520" alt="Three workflow tiers">
 
 - **Problem it solves**
   - Add a field to a save file: one agent changes the write format, another adds a default when loading; both pass their tests, together they overwrite a value from an older save
@@ -102,14 +102,14 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - Project rules live in `check.rules`: `forbid` for banned patterns, `require` for required ones, `cmd` for a project command's exit code; red blocks, yellow is for people to review
   - A file needs an exception: record the rule, file and reason in the top-level `allow`; new exceptions appear in what reviewers receive
 
-<img src="docs/img/en/flow-pipeline.svg" width="720" alt="Full workflow in eight steps">
+<img src="docs/img/en/flow-pipeline.svg" width="520" alt="Full workflow in eight steps">
 
 - **How it works**
   - `pre-commit` runs before Git records a regular commit, `pre-merge-commit` before Git creates an automatic merge commit
   - It reads the files, configuration and baseline staged for commit and compares them with the tree at `HEAD`
   - Project `cmd` checks read from disk; if a tracked file has unstaged changes the hook skips the command and tells you to run it in CI
 
-<img src="docs/img/en/flow-gate-tree.svg" width="720" alt="Which tree the commit gate checks">
+<img src="docs/img/en/flow-gate-tree.svg" width="520" alt="Which tree the commit gate checks">
 
 - **Why this design**
   - Checks belong to Git, not to agent discipline; a person can use `git commit --no-verify` in an emergency, and the plugin hook blocks agents from using it or changing `core.hooksPath`
@@ -131,7 +131,7 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
 <!-- GEN:events END -->
 ```
 
-<img src="docs/img/en/map-gen-section.svg" width="720" alt="Generated section inside a document">
+<img src="docs/img/en/map-gen-section.svg" width="520" alt="Generated section inside a document">
 
 - **How it works**
   - Starts from Git's file list and groups files by the `systems` configuration, or by top-level source directory by default
@@ -139,7 +139,7 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - Regexes in `map` extract things that follow a convention, e.g. calls like `EMIT("order.paid")` feed an event table; dynamically built event names fall outside it
   - On eligible main-branch commits the generated changes are added to the proposed commit, checked with it, and staged only if the checks pass; targets with unstaged edits are skipped, `cmd` / `py` generators run on manual refresh, the automatic merge hook only checks
 
-<img src="docs/img/en/map-pipeline.svg" width="720" alt="How the system map is built">
+<img src="docs/img/en/map-pipeline.svg" width="520" alt="How the system map is built">
 
 - **Why this design**: people write design trade-offs and pitfalls, the script rebuilds the inventories it can get from code; change an import and the next refresh updates the map
 
@@ -156,7 +156,7 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - Put `src/billing/` and "retry" in the entry; it is easier to find than a general note about checkout pitfalls
   - As lessons pile up, run `/nomess:dream` for a proposal, then `/nomess:dream execute`; `execute strike 2 5` drops items 2 and 5
 
-<img src="docs/img/en/lessons-lifecycle.svg" width="720" alt="Life of a lesson">
+<img src="docs/img/en/lessons-lifecycle.svg" width="520" alt="Life of a lesson">
 
 - **How it works**
   - The plugin gives the entry a title, when to look it up, what to do, why, and the evidence; the script dates it and writes it to `inbox.md`; a matching title updates the existing entry, earlier wording stays in Git history
@@ -165,7 +165,7 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - Execution merges duplicates, removes outdated guidance, proposes turning recurring lessons into rules, and verifies the result
 - **Why this design**: for "which lesson should I read before changing checkout retries?", a path and a keyword narrow things enough, so there is no vector database to maintain; the trade-off is that a lesson worded differently can slip past
 
-<img src="docs/img/en/lessons-find.svg" width="720" alt="Search by path and keyword">
+<img src="docs/img/en/lessons-find.svg" width="520" alt="Search by path and keyword">
 
 ## <img src="docs/img/icons/rules.svg" width="34" align="absmiddle"> 5. Path-scoped rules
 
@@ -176,7 +176,7 @@ nomess: 1 new red finding(s), first src/import.py:42 D1 src/import.py lines 42-5
   - Only verified entries are used; drafts in `inbox.md` are skipped
 - **Problem it solves**: "reuse the original idempotency key when retrying checkout" matters in `src/billing/`, but an agent changing homepage styles only pays context for it; put every lesson in the main instructions and the general rules get hard to find
 
-<img src="docs/img/en/rules-context.svg" width="720" alt="Context use compared">
+<img src="docs/img/en/rules-context.svg" width="520" alt="Context use compared">
 
 - **How to use it**
   - `dream` proposes promoting a verified, recurring lesson to a path rule, or you write one in the pitfalls section of a subsystem page
@@ -193,7 +193,7 @@ paths:
 ---
 ```
 
-<img src="docs/img/en/rules-paths.svg" width="720" alt="Rules loaded by path">
+<img src="docs/img/en/rules-paths.svg" width="520" alt="Rules loaded by path">
 
 - **Why this design**: path rules carry conventions that need judgment (which request's key to reuse on a retry); a checkable requirement ("only this module may call the low-level write function in billing code") goes into the commit checks, applied the same way every time
 
@@ -220,26 +220,26 @@ paths:
 | C4 Parallel scheduling | Two active tasks that will edit the same file, or a task starting before its prerequisite has merged, is red; overlap inferred only from wildcard prefixes is yellow |
 | PL-DUP, PL-STALE Documentation | Repeated text across documents, stale paths or subsystem names in unarchived plans; yellow |
 
-<img src="docs/img/en/smell-arch.svg" width="720" alt="Subsystem constraints">
+<img src="docs/img/en/smell-arch.svg" width="520" alt="Subsystem constraints">
 
 - **How it works**
   - D1: strip whitespace and recognized comments, split into tokens; hash each run of 25 consecutive tokens, take the smallest hash in each window of 26 as a fingerprint; when two files share one, go back to the tokens and extend both ways to measure the real match
   - D1 keeps one pass with tokens as written and one with identifiers and literals normalized by type, so a renamed copy is still found; fingerprints shared by too many files are skipped
 
-<img src="docs/img/en/smell-winnow.svg" width="720" alt="Copy-paste fingerprints">
+<img src="docs/img/en/smell-winnow.svg" width="520" alt="Copy-paste fingerprints">
 
   - The baseline identifies findings by rule ID, original color, path and the finding's own traits; line numbers only appear in messages; a file with two frozen red P1 findings gets a new one only at the third
   - Length metrics are compared with their frozen values; growth beyond the configured tolerance is a regression
   - B1: hand-editing the baseline cannot raise an existing rule's allowance; a first freeze applies only to rules the baseline hasn't enabled, that ran in this check and support freezing, and the records must match the current full scan
   - B2: compares both configurations with defaults filled in; removing checks, raising managed thresholds, lowering the review level, moving the baseline or deleting `nomess.json` all trigger it
 
-<img src="docs/img/en/smell-ratchet.svg" width="720" alt="The ratchet">
+<img src="docs/img/en/smell-ratchet.svg" width="520" alt="The ratchet">
 
 - **Why this design**: freezing keeps adoption cheap; B1 and B2 keep a change from weakening the checks it has to pass
 
 ## <img src="docs/img/icons/together.svg" width="34" align="absmiddle"> How the six parts work together
 
-<img src="docs/img/en/together.svg" width="720" alt="How the six parts work together">
+<img src="docs/img/en/together.svg" width="520" alt="How the six parts work together">
 
 - Checkout and a background recovery job both write to the ledger; after the fix, `/nomess:lesson` records why and which two entry points were involved
 - `dream` verifies and keeps the two lessons in different forms:
@@ -251,7 +251,7 @@ paths:
 
 ## <img src="docs/img/icons/sizes.svg" width="34" align="absmiddle"> Choosing a project size and adjusting the defaults
 
-<img src="docs/img/en/sizes.svg" width="720" alt="Three project sizes">
+<img src="docs/img/en/sizes.svg" width="520" alt="Three project sizes">
 
 - `size` selects a set of defaults:
   - `small`: you and one agent at a time; D1, P1, S1, `light` review
