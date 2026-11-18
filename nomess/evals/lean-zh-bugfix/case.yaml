@@ -1,0 +1,28 @@
+schema_version: "1.0"
+name: lean-zh-bugfix
+description: "zh prompt that should load the nomess lean-change skill"
+tags: [zh, lean-change]
+execution:
+  prompt: |
+    这个函数解析 "1h30m" 这样的时长，但 "45m" 会报错。帮我修好，回复改好的代码。
+
+    ```python
+    import re
+
+    def parse_duration(s):
+        m = re.match(r"(\d+)h(\d+)m", s)
+        return int(m.group(1)) * 3600 + int(m.group(2)) * 60
+    ```
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+graders:
+  - type: tool_used
+    name: loads-lean-change
+    tool: Skill
+    input_match: "lean-change"
+    min: 1
+  - type: regex
+    name: ladder-line
+    target: last_message
+    pattern: "Ladder: L[1-7]"
+    match: contains

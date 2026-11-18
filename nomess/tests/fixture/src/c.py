@@ -1,0 +1,2 @@
+# Copyright
+print("ok")

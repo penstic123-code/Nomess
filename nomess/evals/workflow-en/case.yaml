@@ -1,0 +1,15 @@
+schema_version: "1.0"
+name: workflow-en
+description: "en prompt that should load the nomess workflow skill"
+tags: [en, workflow]
+execution:
+  prompt: |
+    We are splitting a big refactor of our billing service (invoices, payments, tax rules) into packages and want three agents to work in parallel. Write the plan: how to split it into packages, who owns which files, and the brief for the first package.
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+graders:
+  - type: tool_used
+    name: loads-workflow
+    tool: Skill
+    input_match: "workflow"
+    min: 1

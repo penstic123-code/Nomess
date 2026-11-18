@@ -1,0 +1,15 @@
+schema_version: "1.0"
+name: workflow-zh
+description: "zh prompt that should load the nomess workflow skill"
+tags: [zh, workflow]
+execution:
+  prompt: |
+    我们要把订单服务的大重构（下单、库存、退款三块）拆成几个包，派三个代理并行做。帮我写方案：怎么拆包、每个包管哪些文件，再写第一个包的派活简报。
+  max_turns: 10
+  allowed_tools: [Read, Glob, Grep, Skill]
+graders:
+  - type: tool_used
+    name: loads-workflow
+    tool: Skill
+    input_match: "workflow"
+    min: 1

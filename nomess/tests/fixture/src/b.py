@@ -1,0 +1,1 @@
+REGISTER("B", 2)

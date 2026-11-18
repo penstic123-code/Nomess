@@ -1,0 +1,32 @@
+{
+  "name": "nomess",
+  "version": "0.9.0",
+  "description": "Keeps AI-written code from turning into a mess: commit-time checks, path-scoped lessons, a generated system map, a design-first workflow and reviews",
+  "author": {
+    "name": "penstic123-code"
+  },
+  "license": "MIT",
+  "keywords": [
+    "workflow",
+    "multi-agent",
+    "memory",
+    "docs",
+    "hooks",
+    "code-quality"
+  ],
+  "userConfig": {
+    "python": {
+      "type": "string",
+      "title": "Python command",
+      "description": "Command the hooks use to run scripts. macOS / Linux: python3; Windows: python, or py if only py is installed. Change it in /config if wrong.",
+      "options": [
+        "python3",
+        "python",
+        "py"
+      ],
+      "required": true
+    }
+  },
+  "homepage": "https://github.com/penstic123-code/Nomess",
+  "repository": "https://github.com/penstic123-code/Nomess"
+}

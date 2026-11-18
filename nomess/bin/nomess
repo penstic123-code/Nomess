@@ -1,0 +1,10 @@
+#!/bin/sh
+# Bare-command entry for agents that did not load a skill. Tries interpreters in fixed order, running a version check first
+# (without Python installed, python3 is a Store stub: the command exists but cannot run).
+for py in python3 python "py -3"; do
+  if $py -c "import sys; sys.exit(sys.version_info < (3, 9))" >/dev/null 2>&1; then
+    exec $py "$(dirname "$0")/../scripts/nomess.py" "$@"
+  fi
+done
+echo "nomess: Python 3.9+ not found, tried: python3, python, py -3" >&2
+exit 2

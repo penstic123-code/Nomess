@@ -1,0 +1,31 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.x"]
+    steps:
+      # Keep LF on Windows so generated files compare byte for byte with the golden hashes.
+      - name: Keep line endings as in the repository
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Git identity for the test repositories
+        run: |
+          git config --global user.name nomess-ci
+          git config --global user.email ci@example.invalid
+      - name: Scripts (includes the cross-platform golden hashes)
+        run: python nomess/tests/run.py
+      - name: Hooks
+        run: python nomess/tests/test_githook.py

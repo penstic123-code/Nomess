@@ -1,0 +1,16 @@
+{
+  "name": "nomess-plugins",
+  "owner": {
+    "name": "penstic123-code"
+  },
+  "metadata": {
+    "description": "nomess: keeps multi-agent Claude Code work from turning into a mess"
+  },
+  "plugins": [
+    {
+      "name": "nomess",
+      "source": "./nomess",
+      "description": "Keeps AI-written code from turning into a mess: commit checks, path-scoped lessons, an auto-updated system map, a design-first workflow and reviews"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{"format": "nomess/1", "main_branch": "main", "lang": "zh-CN", "size": "medium",
+ "docgen": {"modules": {"file": "docs/system-map.md", "map": "modules"},
+            "stamp": {"file": "docs/system-map.md", "cmd": ["python", "-c", "print('stamp 1')"]}},
+ "map": {"modules": {"title": "模块登记", "columns": ["名字", "序号"], "glob": "src/*.py",
+                      "regex": "REGISTER\\(\"(\\w+)\", (\\d+)\\)", "file_col": true, "misses": "动态注册的模块"}},
+ "allow": [{"rule": "R1", "file": "src/c.py", "reason": "命令行入口,print 是正式输出"}],
+ "check": {"rules": [
+   {"id": "R1", "level": "red", "what": "src 里不许 print(", "why": "调试输出混进产物", "glob": "src/*.py", "forbid": "\\bprint\\("},
+   {"id": "R2", "level": "red", "what": "src 文件要有版权头", "why": "来源不明", "glob": "src/*.py", "require": "^# Copyright"},
+   {"id": "R3", "level": "red", "what": "命令规则:外部检查脚本", "why": "演示命令规则", "cmd": ["python", "-c", "import sys; print('外部检查失败'); sys.exit(1)"]},
+   {"id": "R4", "level": "yellow", "what": "TODO 要清", "why": "遗留", "glob": "src/*.py", "forbid": "TODO"}]}}
