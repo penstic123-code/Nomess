@@ -52,6 +52,9 @@ def parse(text, path):
     level = cfg.get("review", {}).get("level", "standard")
     if level not in REVIEW_LEVELS:
         raise ValueError(t("BAD_LEVEL", path, " / ".join(REVIEW_LEVELS)))
+    for key in ("docs_root", "lessons_dir"):  # 先规范化:doc_types 的校验要拿它们比目录
+        if key in cfg:
+            cfg[key] = repo_path(cfg[key], path, key)
     _validate(cfg, path)
     for name, globs in cfg.get("systems", {}).items():
         if not isinstance(globs, list) or not globs or not all(isinstance(g, str) and g.strip() for g in globs):
@@ -63,8 +66,6 @@ def parse(text, path):
         if not isinstance(v, int) or isinstance(v, bool) or v <= 0:
             raise ValueError(t("BAD_BUDGET", path, key, kind))
     # 路径类值统一成仓库相对、正斜杠、无 ./ 和结尾斜杠;各模块直接拿来查快照和拼磁盘路径
-    if "lessons_dir" in cfg:
-        cfg["lessons_dir"] = repo_path(cfg["lessons_dir"], path, "lessons_dir")
     if "baseline" in cfg.get("check", {}):
         cfg["check"]["baseline"] = repo_path(cfg["check"]["baseline"], path, "check.baseline")
     for name, spec in cfg.get("docgen", {}).items():
@@ -109,7 +110,7 @@ SIZE = {"small": {"builtin": ["D1", "P1", "S1"], "review": "light"},
         "medium": {"builtin": ["A1", "D1", "P1", "S1"], "review": "standard"},
         "large": {"builtin": ["A1", "C4", "D1", "P1", "PL-DUP", "PL-STALE", "S1"], "review": "standard"}}
 # 缺省表 = 合法键表:字典逐层比;"*" 是名字随用户取的那一层的条目样子(只用于认键,展开时不往用户条目里补)。
-# 列表条目的键见 ITEM_KEYS。路径类(加载时规范化):check.baseline、lessons_dir、docgen.*.file;glob 类:check.rules[].glob、
+# 列表条目的键见 ITEM_KEYS。路径类(加载时规范化):check.baseline、docs_root、lessons_dir、docgen.*.file;glob 类:check.rules[].glob、
 # scopes[].paths、allow[].file、systems.*、map.*.glob
 DEFAULTS = {
     "format": None, "main_branch": None,  # 必填,parse 查
@@ -141,13 +142,20 @@ DEFAULTS = {
     "rules": {"file_tokens": 400},
     "memory": {"index_tokens": 2000, "page_tokens": 1500, "title_ratio": 0.8},
     "review": {"level": None, "cmd": []},  # level None = 跟 size
-    "lessons_dir": "docs/lessons",
-    "lessons_remind": 10,
+    "docs_root": "docs",  # 项目文档根(13.13):7 类文档、生成的系统图、教训库缺省目录都在它下面
+    "lessons_dir": None,  # None = <docs_root>/lessons,见 lessons_dir()
+    "dev_docs": [],  # 开发者文档的 glob,和 doctypes.DEV_DOCS 合起来用(半管:只就地改,不挪不建不删)
+    "public_docs": [],  # 对外文档的 glob,和 doctypes.PUBLIC_DOCS 合起来用(只读:自动整理绝不碰)
+    "lessons_remind": 10,  # 自动整理的 inbox 线(入口段不再提醒)
+    "doc_types": [],
+    "doc_budget": {"*": 0},  # 类型代号或登记的类型名 -> DOC6 的 token 预算(缺省值在 doctypes.BUDGETS)
+    "dream": {"auto": False, "stale_days": 30, "max_items": 20},  # auto 缺省关:老项目升级后不该突然自己整理;init 模板显式写 true
 }
 ITEM_KEYS = {
     "check.rules": ("id", "level", "what", "why", "glob", "forbid", "require", "cmd", "timeout"),
     "scopes": ("paths", "why", "checks", "smells", "off"),
     "allow": ("rule", "file", "from", "to", "reason"),
+    "doc_types": ("name", "dir", "what"),
 }
 MAP_BUDGETS = ("index_tokens", "page_tokens")
 INT_SMELLS = ("file_lines", "func_lines", "clone_tokens", "clone_lines", "doc_clone_tokens", "fan_in")
@@ -192,6 +200,7 @@ def _validate(cfg, path):
     _smells(cfg.get("smells", {}), path, "smells")
     file_ids = {i for i, c in BUILTIN.items() if c == "file"} | {r.get("id") for r in chk.get("rules", []) if "cmd" not in r}
     _maps(cfg.get("map", {}), path)
+    _doc_types(cfg, path)
     scopes = cfg.get("scopes", [])
     if not isinstance(scopes, list):
         _bad(path, "scopes", scopes)
@@ -237,6 +246,44 @@ def _validate(cfg, path):
         _bad(path, "arch", arch)
 
 
+def _doc_types(cfg, path):
+    """dev_docs / public_docs:glob 列表。doc_types:[{name, dir, what}],dir 是 docs_root 下一层目录、不和内置类型(含教训库目录)和彼此重叠,三项都是非空字符串。dream:auto 布尔,其余正整数。"""
+    import doctypes
+    dt = cfg.get("doc_types", [])
+    if not isinstance(dt, list):
+        _bad(path, "doc_types", dt)
+    for key in ("dev_docs", "public_docs"):
+        v = cfg.get(key, [])
+        if not (isinstance(v, list) and all(isinstance(g, str) and g.strip() for g in v)):
+            _bad(path, key, v)
+        for g in v:
+            pathglob.check(g)
+    root = docs_root(cfg)
+    # 项目文档根和教训库落进对外文档(只读),整理就什么都改不了、检查也全跳过:当配置错误
+    public = pathglob.matcher(doctypes.PUBLIC_DOCS + cfg.get("public_docs", []))
+    for key, d in (("docs_root", root), ("lessons_dir", lessons_dir(cfg))):
+        if public(d + "/x.md"):
+            _bad(path, key, d)
+    taken = doctypes.builtin_dirs(root, lessons_dir(cfg))
+    names = set()
+    for n, x in enumerate(dt):
+        w = "doc_types[%d]" % n
+        if not (isinstance(x, dict) and all(isinstance(x.get(k), str) and x[k].strip() for k in ("name", "dir", "what"))):
+            _bad(path, w, x)
+        x["dir"] = d = posixpath.normpath(x["dir"].strip().replace("\\", "/"))
+        if posixpath.dirname(d) != root or re.search(r"\s", d) or d in taken or x["name"] in names:
+            _bad(path, w, x)
+        taken.add(d)
+        names.add(x["name"])
+    db = cfg.get("doc_budget", {})
+    legal = set(doctypes.BUDGETS) | names
+    if not isinstance(db, dict) or not all(k in legal and _num(v, True) for k, v in db.items()):
+        _bad(path, "doc_budget", db)
+    dr = cfg.get("dream", {})
+    if not isinstance(dr, dict) or not all(isinstance(dr[k], bool) if k == "auto" else _num(dr[k], True) for k in dr):
+        _bad(path, "dream", dr)
+
+
 def _maps(m, path):
     """map 段:预算是正整数;其余每个键是一张抽取表,必填 title / columns / glob / regex,可选键的类型也查。"""
     if not isinstance(m, dict):
@@ -273,12 +320,23 @@ def expanded(cfg):
     for name, spec in e["map"].items():  # 抽取表补可选键的缺省(map 段只有这一层的条目样子会展开)
         if name not in MAP_BUDGETS:
             e["map"][name] = dict({k: v for k, v in DEFAULTS["map"]["*"].items() if v is not None or k in ("misses", "hotspot")}, **spec)
+    e["lessons_dir"] = lessons_dir(e)
     if e["check"]["builtin"] is None:
         e["check"]["builtin"] = list(SIZE[e["size"]]["builtin"])
     e["check"]["builtin"] = sorted(set(e["check"]["builtin"]))
     if e["review"]["level"] is None:
         e["review"]["level"] = SIZE[e["size"]]["review"]
     return e
+
+
+def docs_root(cfg):
+    """项目文档根(仓库相对);老配置没写就是 docs。原始配置和 expanded() 后的都能传。"""
+    return cfg.get("docs_root") or DEFAULTS["docs_root"]
+
+
+def lessons_dir(cfg):
+    """教训库目录:写了 lessons_dir 用它,否则 <docs_root>/lessons(老项目仍是 docs/lessons)。"""
+    return cfg.get("lessons_dir") or docs_root(cfg) + "/lessons"
 
 
 def _specificity(g):
@@ -381,7 +439,7 @@ def unknown_keys(cfg):
 
 # B2:两份展开后的配置逐键比,表里没有的键不比(size 的效果已在 check.builtin、review.level 里)。
 # 判法:superset 只许增;superset_ordered 只许增且已有条目相对顺序不变;by_id 按 id 删或改(level 黄改红除外)都算;
-# same 任何改动;le 变大;ge 档变低;scopes / tables 见各自函数。
+# same 任何改动;le 变大;le_map 按键变大或去掉;ge 档变低;scopes / tables 见各自函数。
 LOOSEN = [
     ("check.builtin", "superset"),
     ("check.rules", "by_id"),
@@ -401,6 +459,10 @@ LOOSEN = [
     ("arch.relations", "by_id"),
     ("systems", "same"),
     ("map", "tables"),
+    ("doc_budget", "le_map"),
+    ("public_docs", "superset"),  # 变窄 = 有文件从“只读”变成可被自动整理改动
+    ("dev_docs", "superset"),  # 变窄 = 有文件从“只许就地改”变成可被挪、删
+    ("docs_root", "same"),  # 换根 = 旧位置不再受 DOC4 等管
     # >>> P22 只在这两行之间追加
     # <<< P22
     # >>> P23 只在这两行之间追加
@@ -498,6 +560,8 @@ def loosened(old, new):
             diff = ["%s -> %s" % (_sig(x), _sig(y))] if x != y else []
         elif how == "le":
             diff = ["%s -> %s" % (x, y)] if y > x else []
+        elif how == "le_map":  # 按键:旧有的键在新里没了(回到缺省)或变大都算
+            diff = ["%s: %s -> %s" % (k, v, (y or {}).get(k)) for k, v in sorted((x or {}).items()) if (y or {}).get(k, float("inf")) > v]
         elif how == "ge":
             diff = ["%s -> %s" % (x, y)] if REVIEW_LEVELS.index(y) < REVIEW_LEVELS.index(x) else []
         elif how == "scopes":

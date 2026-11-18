@@ -24,7 +24,9 @@ from messages import t
 HOOKS = ("pre-commit", "pre-merge-commit")
 LAUNCHER = "nomess-hook"
 SELF = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "nomess.py")).replace("\\", "/")
-GEN_DIRS = (nm_map.OUT_DIR + "/", nm_rules.RULES_DIR + "/")  # 只这两个目录归 nomess 所有;其余的写入都是带 GEN 段的宿主文件
+def gen_dirs(cfg):
+    """只这两个目录归 nomess 所有;其余的写入都是带 GEN 段的宿主文件。系统图目录跟着 docs_root。"""
+    return (nm_map.out_dir(cfg) + "/", nm_rules.RULES_DIR + "/")
 
 HOOK_BODY = '''#!/bin/sh
 h="$(git rev-parse --git-common-dir)/%s"
@@ -68,8 +70,8 @@ def plan(snap, cfg, exec_):
     return {**puts, **nm_map.plan(snap, cfg), **nm_rules.plan(snap, cfg)}
 
 
-def _prune(root):
-    for d in GEN_DIRS:
+def _prune(root, cfg):
+    for d in gen_dirs(cfg):
         outwrite.prune_empty(root, d)
 
 
@@ -77,10 +79,11 @@ def main_refresh(argv):
     """nomess refresh:docgen + map + rules 一次写完。"""
     config = nm_config.find_config()
     root = os.path.dirname(config)
+    cfg = nm_config.load(config)
     with snapshot.open_snapshot(root, "worktree") as snap:
-        changes = plan(snap, nm_config.load(config), True)
+        changes = plan(snap, cfg, True)
     outwrite.apply(root, changes)
-    _prune(root)
+    _prune(root, cfg)
     for rel in changes:
         print("%s %s" % (t("WRITTEN"), rel))
     return 0
@@ -88,7 +91,7 @@ def main_refresh(argv):
 
 # ---------------------------------------------------------------- 钩子
 
-def _skip_reasons(root, idx, rels):
+def _skip_reasons(root, idx, rels, cfg):
     """{生成物: 不能安全改写的原因},可以改写的不列:设了 working-tree-encoding / filter(宿主和输出目录都查,一次 check-attr --stdin);
     宿主文件另查:不是普通文件、工作区内容和索引不一致(hash-object --path 套用该路径的换行和过滤规则再比 oid,
     autocrlf 下干净的 CRLF 文件不算改动;不依赖 assume-unchanged)。"""
@@ -103,7 +106,7 @@ def _skip_reasons(root, idx, rels):
         if rel in blocked:
             out[rel] = t("GH_SKIP_ATTR")
             continue
-        if rel.startswith(GEN_DIRS):
+        if rel.startswith(gen_dirs(cfg)):
             continue
         if idx.files().get(rel) not in snapshot.REGULAR:
             out[rel] = t("GH_SKIP_NOTREG")
@@ -152,7 +155,7 @@ def _gate(root, name, hsnap):
         snap, notes, changes = idx, [], {}
         if _refreshes(root, name, cfg, idx):
             changes = plan(idx, cfg, False)
-            skip = _skip_reasons(root, idx, [r for r, data in changes.items() if data is not None])
+            skip = _skip_reasons(root, idx, [r for r, data in changes.items() if data is not None], cfg)
             for rel in [r for r in changes if r in skip]:
                 del changes[rel]
                 notes.append(t("GH_SKIPPED", rel, skip[rel]))
@@ -163,7 +166,7 @@ def _gate(root, name, hsnap):
         notes += [f["msg"] for f in res["findings"] if f["rule"] == "CMD1"]
         index_only = {}
         if res["writes"] and not reds:  # 基线跟着改名走:和生成物同一条路写进这次提交
-            skip = _skip_reasons(root, idx, list(res["writes"]))
+            skip = _skip_reasons(root, idx, list(res["writes"]), cfg)
             for rel, data in res["writes"].items():
                 if rel in skip:  # 工作区有未暂存编辑或设了过滤 / 编码:只写索引,不碰工作区那份
                     index_only[rel] = data
@@ -183,7 +186,7 @@ def _gate(root, name, hsnap):
         try:
             if changes:
                 outwrite.apply(root, changes, snap)
-                _prune(root)
+                _prune(root, cfg)
             if index_only:
                 outwrite.apply(root, index_only, snap, index_only=True)
         except snapshot.SnapshotError as e:

@@ -44,6 +44,9 @@ DETECTORS = [
     # >>> P25 只在这两行之间追加
     "plancheck",
     # <<< P25
+    # >>> R2 只在这两行之间追加
+    "doctypes",
+    # <<< R2
 ]
 BASELINE = ".nomess-baseline.json"
 BFORMAT = "nomess-baseline/2"
@@ -110,7 +113,7 @@ def stale_sections(snap, cfg, exec_=True):
     """过时的生成段和系统图;exec_ 为假时不跑 cmd 生成器(不执行项目代码)。"""
     stale, _ = docgen.run(snap, cfg, exec_=exec_)
     out = [F("yellow", "GEN", f, 0, n, t("GEN_STALE", n)) for n, f in stale]
-    if snap.isdir(nm_map.OUT_DIR):
+    if snap.isdir(nm_map.out_dir(cfg)):
         out += [F("yellow", "GEN", f, 0, f, t("MAP_STALE", f)) for f in nm_map.plan(snap, cfg)]
     return out
 
@@ -177,7 +180,7 @@ def memory_check(d, cfg):
 
 def lesson_findings(snap, cfg, red_only):
     """教训库体检:红项(L5)总是查;red_only 为假时再加黄项(L4)。"""
-    rel = cfg.get("lessons_dir", "docs/lessons")
+    rel = nm_config.lessons_dir(cfg)
     entries = lessons.snapshot_entries(snap, rel)
     out = lessons.red(entries, rel)
     return out if red_only else out + lessons.health(entries, rel, nm_config.expanded(cfg)["memory"]["title_ratio"])
@@ -288,7 +291,7 @@ def observe(cand, cfg, eff, specs, mods, changes, only, gate, exec_cmd):
     legacy = nm_rules.broken_frontmatter(cand) + lesson_findings(cand, cfg, gate)
     hdr = enabled("HDR", eff.cfg, specs)
     if gate:
-        legacy += doccheck.red(cand)
+        legacy += doccheck.red(cand, cfg)
         ran |= GATE_LEGACY
     else:
         legacy += doccheck.findings(cand, cfg) + nm_rules.findings(cand, cfg) + stale_sections(cand, cfg, exec_cmd)
@@ -494,6 +497,13 @@ def evaluate(cand, base, *, exec_cmd, gate=False, full=False, allow_loosen=False
     # 已有的号多出身份或数变大 -> B1
     seen, loose, judge = tally(obs), [], {r: dict(v) for r, v in Bb.items() if r in specs}
     for rid in newids:
+        sp = specs[rid]
+        # 钩子只因"不跑黄级 / 不跑非钩子旧检查"而没跑的已启用号,核对不了它的首次冻结:交给 --ci 全量核对,钩子不判。
+        # 没启用的号、因工作区不干净被跳过的红级 cmd 规则不在此列,照常报 B1(放过它们就是放过真实的放宽)
+        if gate and rid not in ran and enabled(rid, eff.cfg, specs) and (
+                sp["kind"] == "legacy" and rid not in GATE_LEGACY or sp["kind"] in ("detector", "project") and sp.get("level") == "yellow"):
+            judge[rid] = dict(Bn[rid])
+            continue
         in_base = enabled(rid, bexp, specs)
         ok = not in_base and specs[rid]["freeze"] and rid in ran
         judge[rid] = {}

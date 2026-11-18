@@ -1,55 +1,49 @@
 ---
 name: dream
 description: >-
-  整理记忆和教训库：先体检出提案，用户确认后一次做完、提交、给出 diff。参数：空 = 出提案；"execute [strike N…]" = 执行。
-disable-model-invocation: true
-argument-hint: "[execute [strike N…]]"
+  把教训、文档和记忆整理成一个可撤回的提交。会话钩子让调时（参数 "auto"）或用户说整理文档/记忆时调；"apply N…" 执行 .nomess/dream-notes.md 里的条目。
+argument-hint: "[auto | apply N…]"
 context: fork
 model: sonnet
 ---
 
-# dream：整理记忆和教训
+# dream：整理教训、文档和记忆
 
-`nomess.py` 指 `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`，在项目根执行。分两次调用：先出提案，用户看过再"execute"。提案存 `.nomess/dream-proposal.md`（不提交）。下文字段名是英文的；`zh-CN` 项目写中文的。
+下面的 `nomess` 指 `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`，在项目根目录运行。只用 `nomess` 命令和 Read、Grep、Edit、Write：这些不弹权限确认。不要自己跑 `git` 或别的 shell 命令（会弹窗）；核实历史用 `nomess dream git-log <词>`。下面的字段名用英文；`zh-CN` 项目写中文字段名。
 
-## A. 出提案（`$ARGUMENTS` 为空）
+## A. 整理（参数为空或 `auto`，两者相同）
 
-只读：提案文件是你唯一写的文件；只跑下面的命令、Read、Grep 和 `git log`。只读体检点名的文件和 `inbox.md`；核对事实用 Grep 和 `git log -S <词> --oneline`。
+1. `nomess dream begin`。退出 3（另一次整理占着锁）：回它那一行，停。它打印工作清单、worktree、记忆目录（"没定位到"就只整理项目）、notes 写在哪。
+2. 按下面的动作逐条做。只改那个 worktree（它的路径 + 仓库相对路径）和记忆目录里的文件，绝不改主检出。只读清单点名的东西；对着 worktree 里的代码用 Read、Grep 和 `nomess dream git-log <词>` 核实。
+3. `nomess dream land`：它检查这次整理并落到当前分支，或者整次丢弃并说明原因。原样回它打印的那一行。被丢弃了不要修了重试。中途放弃：`nomess dream abort`。
 
-1. 定位：`nomess.py status --json --no-exec`。项目记忆 = `memory_dir`。为空就不猜：只整理教训库，把 `memory_problem` 写在提案第一行里记忆路径的位置。
-2. 体检，只看报告：`nomess.py check --memory <项目记忆> --all --no-exec` 和 `nomess.py check --all --no-exec`。
-3. 对每个点名的条目和每条 inbox：文件还在吗？做法还成立吗？仓库 docs 里已有的事实，记忆里最多留一行链接。
-4. 写提案。第一行：记忆目录和教训库的绝对路径，以及记忆是怎么定位的（`memory_source`）。然后每条一行：编号 + 动作 + 理由，动作只有这几种：
+挪动或删除文件：`nomess dream mv <旧> <新>` / `nomess dream rm <路径>`（路径相对 worktree，记忆目录里的用绝对路径；退出 2 是被拒：不动那个文件，写一条 note）。
 
-   ```
-   1. 合并 a.md + b.md → a.md：讲同一件事（M7）
-   2. 删除 c.md：X 已在 <提交号> 去掉
-   3. 改写 d.md 第二段：数字已变成 Y（见 <文件>）
-   4. 挪层 e.md → docs/<文件>：是项目事实
-   5. inbox「标题」→ 归入 g.md / 新建主题页 / 删
-   6. 做成路径规则 <文件>#<标题>：路径 src/x/**；规则 <不超过 25 词 / 40 个汉字>
-   7. 做成 check 规则：<id，forbid/require/cmd，一句话> 写进 check.rules
-   8. 登记进 arch：<layers / independent / forbid / relations 项，一句话>
-   9. 把 smells.<key> 从 A 降到 B：<为什么>
-   ```
+## B. 动作（按工作清单的类）
 
-   - 先问教训能不能变成 check 规则（7）或 `arch` 项（8）；只有要 AI 判断的才做成路径规则（6），而且只给会反复用的 `状态: 已核实` 条目。条目原来管的路径照抄，不放大。
-   - 阈值只许降（9）：调高是放宽，提交闸门会拦；改写成给人看的备注。
-   - 两条冲突时，留对的，改写或删掉另一条；旧说法在 git 历史里。
-   - 末尾一行：记忆索引现在多少 token、执行后多少（不许变多；中文按字数，其余字符数 / 4）。
-5. 回用户：提案全文 + "回 `/nomess:dream execute`，或 `/nomess:dream execute strike 2 5`"。到此为止。
+教训（worktree 里教训目录下的文件；一条是 `## 标题` 加若干 `键: 值` 行）：
+- **inbox**：每条挪进它所属的主题页，或新建主题页 `<教训目录>/<主题>.md`，或删掉；然后从 `inbox.md` 里去掉。`<教训目录>/README.md` 不存在时，把 `${CLAUDE_PLUGIN_ROOT}/skills/init/templates/<lang>/docs/lessons/README.md` 拷过去；`nomess.json` 的 docgen 里没有 `lessons-index` 时，登记它写成 note。
+- **标题近似**：合成一条。两条冲突时留对的那条；旧说法留在 git 历史里。
+- **未核实**：对着代码核实。对 → `Status: verified`；不对 → 改写或删掉。带 `Source: external …` 的条目你永远不改成已核实、也不删那一行（否则 land 整次丢弃）：它的核实写成 note。
+- **路径和规则**：反复用到的已核实条目加 `Paths:`（照抄条目已覆盖的路径，不放大）和 `Rule:`（英文 25 词 / 中文 40 字以内）。
+- **缺别名**：给经手的条目加一行 `Aliases:`，逗号分隔：中英都写，含常见说法和缩写。
+- **文档缺口**（标题以 `Doc gap:` / `文档缺口:` 开头）：汇总成一条 note，提议登记新文档类型或给系统页加固定段；写进 note 后删掉这些条目。
 
-## B. 执行（`$ARGUMENTS` 以 "execute" 开头）
+文档（只有项目文档根、教训目录、已有的开发者文档和 `AGENTS.md` 的生成段可写；碰了别的 land 整次丢弃）：
+- **方案**（PL-DUP、PL-STALE、PLN2）：同一件事写了两份 → 合成一份，删掉另一份并改好链接。过时方案 → 挪进 `<docs_root>/plans/archive/YYYY-MM-DD-<名>.md`，写 `Status: superseded` 和 `Superseded-by:`。
+- **排期里已合的行**：每行挪进它所属方案末尾的变更记录；排期只留没做完的行。
+- **DOC4 放错位置 / 散落 .md**：看得出类型的挪进该类型的位置并改链接；重复的合并，过时的归档。哪类都不像的留在原处（文档目录把它列为未归类），写一条 note 提议新类型。
+- **DOC5 孤儿页**：从它该挂的页链过去，或合并掉。
+- **DOC6 超长**：原页改成概要页（这是什么、要点、往下看哪页），细节按主题拆到同一文件夹的子页（`systems/render.md` → `systems/render-shadows.md`），概要页链过去。不加目录层级。系统页的四段固定标题留在概要页；系统页的子页开头也写三行头（`这是什么：` / `为什么要有：` / `和谁配合：`），否则 DOC3 报黄。
+- **过时引用**（提到的路径已不存在）：项目文档 → 对着代码改掉或删掉那句；开发者文档 → 就地改（绝不新建、删除、挪动）；对外文档 → 只写 note。
+- **记忆超预算**：合并、精简、删除；项目事实搬进对应的 docs 页，记忆里留一行链接。索引保持一个主题一行 `[主题](文件) — 何时用`，改好 `[[…]]` 链接。
 
-1. 读提案文件（没有就停）；划掉的编号不做。
-2. 先提交，这样下面的一切都能用 `git revert` 撤回：
-   - 记忆目录：`git -C <目录> rev-parse --show-toplevel`。不是仓库 → `git init`，并设 `core.autocrlf false`。自己就是仓库 → 有未提交的改动就 `git -C <目录> add -A -- .` 并提交"pre-dream snapshot"。在别人的仓库里 → 不在那里提交，回报里说明。
-   - 项目仓库：`git diff --cached --name-only` 有输出（用户自己暂存了东西），第 5 步就不提交项目仓库，并说明。
-3. 一次做完剩下的所有条目：
-   - 改指向被删、被合并、被挪走的页的 `[[…]]` 链接和索引行；索引一个主题一行 `[主题](文件) — 何时用`。
-   - 教训：用 `nomess.py lessons add` 写（同标题原地覆盖）；处理完的 inbox 条目删掉。第一次建主题页时，再把 `${CLAUDE_PLUGIN_ROOT}/skills/init/templates/<lang>/docs/lessons/README.md` 拷进教训库目录，并加 docgen 项 `"lessons-index": {"file": "<教训库目录>/README.md", "builtin": "lessons-index"}`。
-   - 路径规则：给条目加 `路径:` 和 `规则:`（系统页则加在 `## 坑` 下）。
-   - check 规则、`arch` 项、阈值：改 `nomess.json`（写法见 `${CLAUDE_PLUGIN_ROOT}/scripts/README.md`）；如果 `nomess.py check` 对新规则或 `arch` 项报红，就撤掉它并报告（绝不冻结）。规则登记后删掉那条教训。
-4. 校验，没过就改到过：`nomess.py refresh`；`nomess.py check` 无红；`nomess.py check --memory <记忆目录>` 无红（没有断链）；记忆索引 token 不比之前多。
-5. 每个仓库提交一次，不推送：记忆仓库 `git -C <目录> add -A -- .` 后提交"dream: <几项>"；项目仓库：把改的教训、docs、`nomess.json` 和 `.claude/rules/nomess/` 逐个 `git add`，再提交。
-6. 删提案文件。回用户：每个仓库的 `git diff --stat <之前>..<之后>`、提交号、没做的条目和原因，以及撤回命令 `git -C <目录> revert <提交号>`。
+只写现在的样子：旧说法直接改掉，不追加"更新：…"。
+
+## C. notes：要人定的
+
+写进 worktree 里的 `.nomess/dream-notes.md`，一行一条、带编号（land 会追加到主检出的那份）：一切要改 `nomess.json` 的（检查规则、`arch` 条目、阈值、文档类型、生成段）；外部来源条目的核实；拿不准的删除；新文档类型；可能过时的对外文档。
+
+## D. `apply N…`
+
+在主检出里执行 `.nomess/dream-notes.md` 的第 N… 条（不用 worktree，不跑 `begin` / `land`）；这时可以改 `nomess.json`（格式见 `${CLAUDE_PLUGIN_ROOT}/scripts/README.md`）。外部来源条目只有代码确认了才改成已核实，同时去掉它的 `Source:` 行。新规则或 `arch` 条目让 `nomess check` 变红的，去掉并报告，绝不冻结；规则登记好后删掉那条教训。然后 `nomess refresh`、`nomess check`，从 notes 里删掉做完的行，不提交，回一行：做了什么、哪些没做及原因。调高阈值是放宽，提交闸门会挡：说明要人来提交。

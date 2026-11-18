@@ -229,10 +229,27 @@ def t_link_case(tmp):
            "⑦ 大小写写错的链接应报红,写对的不报(在 Windows 上也一样): %r" % p.stdout)
 
 
+def t_guard_stray_doc(tmp):
+    """⑧ 13.12 第 1 条:Write 新建 docs_root 下无类型的 .md 当场 deny(带出路);有类型的、已存在的、没有 nomess.json 的不管。"""
+    root = mk(tmp, "stray", [("docs/notes/old.md", "# 存量\n")])
+
+    def write(cwd, rel):
+        hook_in = json.dumps({"tool_name": "Write", "tool_input": {"file_path": rel, "content": "# x\n"}, "cwd": cwd})
+        return subprocess.run([sys.executable, GUARD], input=hook_in, capture_output=True, text=True, env=ENV).stdout
+    out = write(root, "docs/notes/new.md")
+    expect('"deny"' in out and "doc_types" in out, "⑧ 新建无类型 docs 页应 deny 并给出路: " + out)
+    for rel in ("docs/systems/core.md", "docs/plans/x.md", "docs/notes/old.md", "notes/free.md"):
+        expect('"deny"' not in write(root, rel), "⑧ %s 不该挡" % rel)
+    bare = os.path.join(tmp, "bare")
+    os.makedirs(bare)
+    git(bare, "init", "-q")
+    expect(write(bare, "docs/notes/new.md").strip() == "", "⑧ 没有 nomess.json 的仓库不管")
+
+
 def main():
     tmp = tempfile.mkdtemp(prefix="nm-compat-")
     try:
-        for fn in (t_husky, t_framework, t_worktree, t_global_uninstall, t_autocrlf, t_inbox_merge, t_link_case):
+        for fn in (t_husky, t_framework, t_worktree, t_global_uninstall, t_autocrlf, t_inbox_merge, t_link_case, t_guard_stray_doc):
             print("== " + fn.__name__)
             fn(tmp)
     finally:

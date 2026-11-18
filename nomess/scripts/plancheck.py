@@ -1,4 +1,4 @@
-"""总排期和方案对账(整棵树的检测,每次读 docs/schedule.md 和 docs/plans/*.md):
+"""总排期和方案对账(整棵树的检测,每次读 <docs_root>/schedule.md 和 <docs_root>/plans/*.md):
   C4        并行的包抢同一个文件:两个“在做”重叠红(有依赖也报);“在做”的包依赖未合红;两个“待派”重叠黄。
             红只给确定的重叠:有现存文件同时匹配两边,或两边有字面路径(不带通配符)完全相同;
             只凭 glob 第一个通配符之前的字面前缀推断的重叠(双方都要新建的路径也算)降黄,“在做”也是。
@@ -12,11 +12,11 @@ import doccheck
 import lessons
 import map as nm_map
 import messages
+import nm_config
 import pathglob
 from messages import code_of, t
 from nm_config import F
 
-SCHEDULE = "docs/schedule.md"
 WILD = re.compile(r"[*?\[]")
 M = {
     "PC_C4": ("parallel packages touch the same files", "并行的包抢同一个文件"),
@@ -44,9 +44,13 @@ def _cells(line):
     """Markdown 表格一行切成单元格。"""
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
-def schedule(snap):
+def sched_path(cfg):
+    return nm_config.docs_root(cfg) + "/schedule.md"
+
+
+def schedule(snap, cfg):
     """总排期表 -> ([{pkg, deps, state, files: [glob], line}], [(行号, 原因)]);没有文件、没有表、没有“可改文件”列就是空。列数不对、状态值不认识的行跳过并记进第二项。"""
-    text = snap.text(SCHEDULE)
+    text = snap.text(sched_path(cfg))
     if text is None:
         return [], []
     lines = text.replace("\r\n", "\n").split("\n")
@@ -115,18 +119,19 @@ def _clash(a, b, files):
     return None
 
 
-def c4(snap):
-    pkgs, bad = schedule(snap)
+def c4(snap, cfg):
+    sched = sched_path(cfg)
+    pkgs, bad = schedule(snap, cfg)
     out, files, by = [], snap.files(), {q["pkg"]: q for q in pkgs}
-    out += [F("yellow", "C4", SCHEDULE, n, "row", t("PC_ROW", why), k=["row", str(n)]) for n, why in bad]
+    out += [F("yellow", "C4", sched, n, "row", t("PC_ROW", why), k=["row", str(n)]) for n, why in bad]
     for p in pkgs:
         for d in p["deps"]:
             if d not in by:
-                out.append(F("yellow", "C4", SCHEDULE, p["line"], "%s -> %s" % (p["pkg"], d), t("PC_NODEP", p["pkg"], d), k=[p["pkg"], d, "nodep"]))
+                out.append(F("yellow", "C4", sched, p["line"], "%s -> %s" % (p["pkg"], d), t("PC_NODEP", p["pkg"], d), k=[p["pkg"], d, "nodep"]))
         if p["state"] == "doing":
             for d in p["deps"]:
                 if d in by and d != p["pkg"] and by[d]["state"] != "merged":
-                    out.append(F("red", "C4", SCHEDULE, p["line"], "%s -> %s" % (p["pkg"], d), t("PC_DEP", p["pkg"], d), k=[p["pkg"], d, ""]))
+                    out.append(F("red", "C4", sched, p["line"], "%s -> %s" % (p["pkg"], d), t("PC_DEP", p["pkg"], d), k=[p["pkg"], d, ""]))
     for i, a in enumerate(pkgs):
         for b in pkgs[i + 1:]:
             if a["state"] == b["state"] and a["state"] in ("doing", "todo") and a["files"] and b["files"]:
@@ -134,7 +139,7 @@ def c4(snap):
                 if hit is not None:
                     path, sure = hit
                     x, y = sorted((a["pkg"], b["pkg"]))
-                    out.append(F("red" if sure and a["state"] == "doing" else "yellow", "C4", SCHEDULE, max(a["line"], b["line"]),
+                    out.append(F("red" if sure and a["state"] == "doing" else "yellow", "C4", sched, max(a["line"], b["line"]),
                                  "%s / %s %s" % (x, y, path), t("PC_OVERLAP", x, y, path), k=[x, y, path]))
     return out
 
@@ -159,10 +164,11 @@ def mentioned(text):
     return out
 
 
-def stale(snap, systems):
+def stale(snap, cfg, systems):
     out = []
-    for rel in snap.ls("docs/plans", ".md", True):
-        if rel.startswith("docs/plans/archive/"):
+    plans = nm_config.docs_root(cfg) + "/plans"
+    for rel in snap.ls(plans, ".md", True):
+        if rel.startswith(plans + "/archive/"):
             continue
         text = snap.text(rel)
         seen = set()
@@ -179,4 +185,4 @@ def stale(snap, systems):
 def run(snap, changes, eff):
     on = eff.cfg["check"]["builtin"]
     systems = nm_map.systems_of(eff.cfg, deps.all_files(snap))[0] if "PL-STALE" in on else {}
-    return (c4(snap) if "C4" in on else []) + (stale(snap, systems) if "PL-STALE" in on else [])
+    return (c4(snap, eff.cfg) if "C4" in on else []) + (stale(snap, eff.cfg, systems) if "PL-STALE" in on else [])

@@ -1,5 +1,5 @@
 """nomess doctor [--python 名字]:零 token 的自检,每项一行,坏的带一句修法。
-查:Claude Code 版本、运行这个脚本的 Python 版本、钩子用的解释器(从 ~/.claude/settings.json 的 pluginConfigs 读,或 --python 指定)、
+查:Claude Code 版本、SessionStart 钩子是否登记、运行这个脚本的 Python 版本、钩子用的解释器(从 ~/.claude/settings.json 的 pluginConfigs 读,或 --python 指定)、
 git、nomess.json 能不能读、提交前钩子能不能跑、CLAUDE.md 有没有导入 AGENTS.md、git 钩子接入(按接入方式、逐 worktree)、.nomess/cache/ 大小。有失败项退出码 1。"""
 import json
 import os
@@ -10,6 +10,7 @@ import sys
 
 import doccheck
 import githook
+import messages
 import nm_config
 import snapshot
 from messages import t
@@ -17,6 +18,11 @@ from messages import t
 MIN_CLAUDE = "2.1.277"  # 直接执行的 hook、userConfig 的 options(2.1.271)、直接读 AGENTS.md(2.1.277)三者里最高的
 PLUGIN = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 PROBE = '{"tool_name": "Bash", "tool_input": {"command": "echo nomess-doctor"}, "cwd": "."}'  # 不是 git 命令:钩子应零输出退出 0
+M = {
+    "DR_SESSION_OK": ("SessionStart hook registered (auto-enable and auto-tidy)", "SessionStart 钩子已登记(自动启用和自动整理)"),
+    "DR_SESSION_BAD": ("SessionStart hook is not registered in hooks/hooks.json. Fix: reinstall the plugin", "SessionStart 钩子没在 hooks/hooks.json 登记。修法:重装插件"),
+}
+messages.add(M)
 VERSION_RE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
 
 
@@ -107,6 +113,13 @@ def checks(start, python_name):
     except (OSError, subprocess.TimeoutExpired) as e:
         bad = str(e)
     out.append(("ok", t("DR_HOOK_OK")) if bad is None else ("fail", t("DR_HOOK_BAD", hook_py.replace("\\", "/"), bad.replace("\n", " "))))
+    # SessionStart 钩子有没有登记
+    try:
+        with open(os.path.join(PLUGIN, "hooks", "hooks.json"), encoding="utf-8") as f:
+            reg = "session.py" in json.dumps(json.load(f).get("hooks", {}).get("SessionStart", []))
+    except (OSError, ValueError):
+        reg = False
+    out.append(("ok", t("DR_SESSION_OK")) if reg else ("fail", t("DR_SESSION_BAD")))
     # CLAUDE.md 有没有导入 AGENTS.md
     has_a, has_c = (os.path.isfile(os.path.join(base, n)) for n in ("AGENTS.md", "CLAUDE.md"))
     if not has_a:

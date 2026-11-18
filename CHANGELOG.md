@@ -2,6 +2,35 @@
 
 Versions follow [Semantic Versioning](https://semver.org/). Each release has three parts: Added, Changed, Fixed; breaking changes come first, with migration steps.
 
+## 1.1.0 – 2026-11-19
+
+### Breaking changes
+
+- A new `.md` under the doc root (`docs/` by default) that is not in any document-type location is red DOC4 and blocks the commit (the AI is also stopped when it tries to write one); pages already there are only yellow.
+- The nomess section of `AGENTS.md` changed: the inbox reminder line is gone; two lines say where docs go and that docs describe things as they are now. The section is refreshed on the next main-branch commit, or by `nomess refresh`.
+- `/nomess:dream` no longer writes a proposal and waits: it tidies in a temporary worktree and lands one commit by itself. `/nomess:dream execute [strike N…]` is gone; items that need a person go to `.nomess/dream-notes.md` and run with `/nomess:dream apply N…`.
+- `/nomess:init` asks nothing; it runs `nomess init --auto`.
+
+Migration for an existing project, once after upgrading: run `nomess init --auto` (it only fills in what is missing: the `docs-index` and `lessons-index` entries and markers), then `nomess check --freeze` (new yellow findings such as DOC4–7 in existing docs go into the baseline). The automatic tidy stays **off** in projects created before 1.1; turn it on with `"dream": {"auto": true}` in `nomess.json`. A docs site whose source is in `docs/` (MkDocs, Sphinx, Docusaurus, VitePress, mdBook, Jekyll) is detected at run time: its pages count as public docs and are never changed or flagged.
+
+### Added
+
+- Automatic enabling: a SessionStart hook tells the AI, in a Git repo without `nomess.json`, to run `nomess init --auto` before its first file change and tell you in one sentence. No questions (size `small`, language from the conversation, main branch worked out). `nomess off` switches a repo off; `userConfig.auto_init` switches it off everywhere.
+- Automatic tidy: when the inbox, unverified entries, misplaced or over-long docs, merged schedule rows or stray `.md` files pass a threshold (at most once a day, and only if something changed), the hook asks the AI to run `nomess:dream` in the background. `nomess dream begin | land | abort | git-log` does the mechanical part: lock, temporary worktree, guard rails, commit, cherry-pick onto the current branch, a one-sentence summary with the undo command. A failed landing is discarded, never retried. Config `dream: {auto, stale_days, max_items}`.
+- No permission prompts: the PreToolUse hook allows the plugin's own whitelisted commands and edits inside the tidy worktree and the project memory folder.
+- Document types are enforced: DOC4 (misplaced), DOC5 (orphan pages), DOC6 (over the length budget, `doc_budget`), DOC7 (system page possibly out of date); `doc_types` registers extra types; a generated `docs-index` lists every doc at the end of the overview.
+- Three tiers of docs: project docs (`docs_root`, default `docs`) are fully managed; developer docs (`dev_docs`, by default `CONTRIBUTING*` and the like) are only edited in place; public docs (`public_docs`, by default `README*`, `CHANGELOG*` and the like, plus a detected docs-site source) are never changed automatically. When the docs site lives in `docs/`, `init --auto` puts project docs in `project-docs/`.
+- Lessons carry aliases (`lessons add -k "存档, save, persistence"`), matched like titles. A lookup by file also scores the entry's `Paths:`, the same module and modules it directly depends on, with the reason marked.
+- `lessons add --external <source>` records where a lesson came from and keeps it unverified; such entries never become rules and the tidy cannot verify them (L6 in review input when someone does).
+- Lessons titled `Doc gap:` / `文档缺口:` are gathered by the tidy into a proposal.
+- Templates: `AGENTS.md` gets an "Environment and running" heading; the system page has four fixed sections (What this is, How to use, Pitfalls, Known issues).
+
+### Changed
+
+- DOC1 also checks developer and public docs (README and the like), yellow only.
+- `lessons_remind` is now the inbox threshold for the automatic tidy.
+- The `workflow` skill: a `small` project runs `nomess init --auto --size medium` before its first parallel dispatch; doc paths follow `docs_root`.
+
 ## 1.0.0 – 2026-11-18
 
 ### Removed

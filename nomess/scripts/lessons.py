@@ -1,4 +1,4 @@
-"""教训库 docs/lessons/:*.md 里每条是 `## 标题` 加若干 `键: 值` 行(键见 messages.NAMES["lesson"],中英都认,写出按 lang);`内容:`(`What:`)可跨多行,到下一个键行或下一条为止。
+"""教训库(lessons_dir,缺省 <docs_root>/lessons/):*.md 里每条是 `## 标题` 加若干 `键: 值` 行(键见 messages.NAMES["lesson"],中英都认,写出按 lang);`内容:`(`What:`)可跨多行,到下一个键行或下一条为止。
 代码围栏(``` 或 ~~~)里的行不当标题和键行。旧版写的 `日期:` 读作 `更新:`(覆盖时改写成 `更新:`)。
 只有 `状态: 已核实`(`Status: verified`)算已核实;没写或写了不认识的都不算。
 inbox.md 是待整理。add 的标题和库里已有条目相同(忽略大小写和空白)时原地覆盖那一条(旧说法靠 git 历史留着)。  find <关键词...>  add  status
@@ -9,6 +9,7 @@ import os
 import re
 
 import nm_config
+import pathglob
 from messages import NAMES, alts, code_of, name as nm_name, t
 from nm_config import F
 
@@ -21,7 +22,7 @@ FIELD_RE = re.compile(r"^(%s)[:：]\s?(.*)$" % "|".join(map(re.escape, _KEY_OF))
 
 def lessons_dir():
     config = nm_config.find_config()
-    return os.path.join(os.path.dirname(config), nm_config.load(config).get("lessons_dir", "docs/lessons"))
+    return os.path.join(os.path.dirname(config), nm_config.lessons_dir(nm_config.load(config)))
 
 
 def text_lines(text):
@@ -117,16 +118,77 @@ def _norm(s):
     return s.lower().replace("\\", "/")
 
 
-def _title_key(t):
+def title_key(t):
     return "".join(t.lower().split())
 
 
+def is_external(e):
+    """条目的 `来源:` 以 `外部` / `external` 开头 = 外部来源:永不进规则文件,也不该被自动整理转正(设计稿 13.2 F;L6 按同一写法判断)。"""
+    return e["source"].lower().startswith(alts("source_kind", "external"))
+
+
+def _file_context(kws):
+    """kws 里第一个是仓库内已有文件的:(该文件的子系统, 它直接依赖的子系统们, {子系统: [文件]}, 仓库文件名集合);没有返回 None。
+    子系统和依赖边取 arch.model()(走已有缓存),只取“它依赖谁”一层:改 A 要守的是 A 用到的东西的规矩,反向和多跳会把核心模块的教训带给所有人。"""
+    import arch
+    import deps
+    import snapshot
+    config = nm_config.find_config()
+    root = os.path.dirname(config)
+    rel = next((r for r in (os.path.relpath(os.path.abspath(k), root).replace("\\", "/") for k in kws) if os.path.isfile(os.path.join(root, r))), None)
+    if rel is None:
+        return None
+    with snapshot.open_snapshot(root, "worktree") as snap:
+        owner, _, sys_edges, _ = arch.model(snap, nm_config.expanded(nm_config.load(config)))
+    by_system = {}  # 先按子系统分好文件:每条教训只在要比的子系统的文件里找,不必每次扫一遍全仓库的归属表
+    for f, x in owner.items():
+        by_system.setdefault(x, []).append(f)
+    mine = owner.get(rel)
+    if mine is None:
+        return rel, None, [], by_system
+    return rel, mine, sorted({b for a, b in sys_edges if a == mine}), by_system
+
+
+def _matcher(e):
+    """条目 `路径:` 的匹配函数;没写或写了不支持的 glob 返回 None(rules 会报 RUL5)。"""
+    try:
+        return pathglob.matcher(pathglob.split_globs(e["paths"])) if e["paths"] else None
+    except ValueError:
+        return None
+
+
+def _in_system(e, match, system, by_system):
+    """条目的 `路径:`(match 是它编好的匹配函数,可为 None)匹配到该子系统的某个文件,或条目文字里出现子系统名。"""
+    if re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(system), " ".join((e["title"], e["summary"], e["body"])), re.I):
+        return True
+    return bool(match) and any(match(f) for f in by_system.get(system, ()))
+
+
 def find(d, kws, limit=3):
+    """按分取前 limit 条;返回的条目多一个 marks(如 `[同模块]`、`[依赖 net]`)。
+    标题和别名命中同权重;参数是仓库里的文件时再加:`路径:` 命中 +10,同子系统 +4,直接依赖的子系统 +2(三选一取高)。"""
+    ctx = _file_context(kws)
     kws = [_norm(k) for k in kws]
     scored = []
     for e in all_entries(d):
-        t, s_, b = _norm(e["title"]), _norm(e["summary"]), _norm(e["body"])
-        s = sum(3 * t.count(k) + 2 * s_.count(k) + min(b.count(k), 2) for k in kws)
+        ti, s_, b, al = _norm(e["title"]), _norm(e["summary"]), _norm(e["body"]), _norm(e["aliases"])
+        s = sum(3 * (ti.count(k) + al.count(k)) + 2 * s_.count(k) + min(b.count(k), 2) for k in kws)
+        e["marks"] = []
+        if ctx:
+            rel, mine, dep_systems, by_system = ctx
+            match = _matcher(e)  # 每条只编译一次
+            if match and match(rel):
+                s += 10
+            elif mine is None:
+                pass
+            elif _in_system(e, match, mine, by_system):
+                s += 4
+                e["marks"].append(t("MARK_SAME"))
+            else:
+                dep = next((x for x in dep_systems if _in_system(e, match, x, by_system)), None)
+                if dep:
+                    s += 2
+                    e["marks"].append(t("MARK_DEP", dep))
         if s:
             scored.append((-s, e))
     scored.sort(key=lambda x: x[0])
@@ -138,10 +200,11 @@ def render(e):
     return ["## " + e["title"]] + ["%s: %s" % (nm_name("lesson", c), val(c)) for c in FIELDS if e[c]]
 
 
-def add(d, title, summary, body, verified=True):
-    """同标题覆盖库里已有的那条,否则追加进 inbox。返回一行说明。"""
-    hit = next((x for x in all_entries(d) if _title_key(x["title"]) == _title_key(title)), None)
+def add(d, title, summary, body, verified=True, aliases="", source=""):
+    """同标题覆盖库里已有的那条,否则追加进 inbox。返回一行说明。aliases / source 为空时覆盖会保留旧条目的值。"""
+    hit = next((x for x in all_entries(d) if title_key(x["title"]) == title_key(title)), None)
     e = dict(hit or dict.fromkeys(FIELDS, ""), title=title, summary=summary, body=body,
+             **{k: v for k, v in (("aliases", aliases), ("source", source)) if v},
              status="verified" if verified else "unverified", updated=datetime.date.today().isoformat())
     if hit:
         p = os.path.join(d, hit["file"])
@@ -183,7 +246,7 @@ def red(entries, rel):
         where = "%s/%s" % (rel, INBOX)
         for k in dict.fromkeys(k for k in e["keys"] if e["keys"].count(k) > 1):
             out.append(F("red", "L5", where, e["line"], e["title"] + "|" + k, t("L5_KEY", e["title"], nm_name("lesson", k))))
-        first = seen.setdefault(_title_key(e["title"]), e)
+        first = seen.setdefault(title_key(e["title"]), e)
         if first is not e:
             out.append(F("red", "L5", where, e["line"], e["title"], t("L5_DUP", e["title"], first["line"])))
     return out
@@ -201,7 +264,7 @@ def health(entries, rel, ratio):
 
 def main(argv):
     import argparse
-    ap = argparse.ArgumentParser(prog="nomess lessons", description="lesson library docs/lessons/: find | add | status")
+    ap = argparse.ArgumentParser(prog="nomess lessons", description="lesson library (lessons_dir, default <docs_root>/lessons/): find | add | status")
     sub = ap.add_subparsers(dest="cmd", required=True)
     f = sub.add_parser("find", help="look up by keyword / path, at most 3: title - summary; unverified ones are marked")
     f.add_argument("keywords", nargs="+")
@@ -209,15 +272,18 @@ def main(argv):
     a_.add_argument("title")
     a_.add_argument("-s", "--summary", required=True, help="when it applies (with file paths and keywords)")
     a_.add_argument("-b", "--body", required=True, help="what to do, why, source")
+    a_.add_argument("-k", "--aliases", default="", help="other names for it, comma separated, Chinese and English (e.g. \"存档, save, persistence\")")
+    a_.add_argument("--external", metavar="SOURCE", help="learned from a web page, someone else's doc or tool output (URL or file): always written as unverified")
     a_.add_argument("--unverified", action="store_true", help="inferred, not tested; default is verified")
     sub.add_parser("status", help="inbox count, age of the oldest entry in days, unverified count (sorting empties the inbox)")
     a = ap.parse_args(argv)
     d = lessons_dir()
     if a.cmd == "find":
         for e in find(d, a.keywords):
-            print("%s%s — %s [%s]" % (e["title"], "" if e["verified"] else t("UNVERIFIED_MARK"), e["summary"], e["file"]))
+            print("%s%s — %s [%s]%s" % (e["title"], "" if e["verified"] else t("UNVERIFIED_MARK"), e["summary"], e["file"], "".join(e["marks"])))
     elif a.cmd == "add":
-        print(add(d, a.title, a.summary, a.body, not a.unverified))
+        source = "%s %s" % (nm_name("source_kind", "external"), a.external) if a.external else ""
+        print(add(d, a.title, a.summary, a.body, not (a.unverified or a.external), a.aliases, source))
     else:
         p = os.path.join(d, INBOX)
         es = parse(p) if os.path.isfile(p) else []

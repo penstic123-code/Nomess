@@ -348,7 +348,7 @@ def _run_d1(snap, changed, eff):
 
 
 def _run_docs(snap, changed, eff):
-    rx = pathglob.compile("docs/**/*.md")
+    rx = pathglob.compile(nm_config.docs_root(eff.cfg) + "/**/*.md")
     docs = [p for p in deps.all_files(snap) if rx.match(p)]
     queries = [p for p in changed if rx.match(p)]
     if not queries:

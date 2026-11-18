@@ -5,4 +5,4 @@ The single construction entry point: packages, order, file ownership and status 
 | Package | What | Files | Depends | Status | Brief / handback |
 |---|---|---|---|---|---|
 
-Status values: Todo / Doing / Review / Rework / Merged. Files: globs separated by commas; list explicit files where you can.
+Status values: Todo / Doing / Review / Rework / Merged; the automatic tidy moves Merged rows into the change log of their plan. Files: globs separated by commas; list explicit files where you can.

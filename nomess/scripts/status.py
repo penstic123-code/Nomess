@@ -39,7 +39,9 @@ def project_root(base):
 
 
 def _setting(root, key):
-    """(值, 来自哪个文件):按 Claude Code 的优先级找第一个写了 key 的 settings 文件。"""
+    """(值, 来自哪个文件):按 Claude Code 的优先级找第一个写了 key 的 settings 文件。
+    官方文档(code.claude.com/docs/en/memory,Storage location,2026-11-18 核实):autoMemoryDirectory 在用户、项目、本机、策略各层都认。
+    项目级指到任意位置的风险在使用处收(dream 只在记忆目录位于配置目录下才自动 git init,guard 只放行记忆目录里的 .md)。"""
     for p in (os.path.join(MANAGED, "managed-settings.json"), os.path.join(root, ".claude", "settings.local.json"),
               os.path.join(root, ".claude", "settings.json"), os.path.join(claude_dir(), "settings.json")):
         if os.path.isfile(p):
@@ -56,6 +58,8 @@ def memory_location(base):
     v, src = _setting(root, "autoMemoryDirectory")
     if v:
         d, source = os.path.expanduser(v), "autoMemoryDirectory (%s)" % src
+        if not os.path.isabs(d):  # 文档要求绝对路径或 ~/ 开头
+            return {"dir": "", "source": source, "problem": "not an absolute path: " + v}
     elif os.environ.get("CLAUDE_CODE_PROJECT_DIR_NAME") and os.environ.get("CLAUDE_CONFIG_DIR"):
         d, source = os.path.join(claude_dir(), "projects", os.environ["CLAUDE_CODE_PROJECT_DIR_NAME"], "memory"), "CLAUDE_CODE_PROJECT_DIR_NAME"
     else:
@@ -85,7 +89,7 @@ def main(argv):
     loc = memory_location(base)
     mem = loc["dir"]
     over = [f for f in check.memory_check(mem, cfg) if f["rule"] in ("M2", "M3")] if mem and os.path.isfile(os.path.join(mem, "MEMORY.md")) else []
-    lessons_dir = cfg.get("lessons_dir", "docs/lessons")
+    lessons_dir = nm_config.lessons_dir(cfg)
     inbox = os.path.join(base, lessons_dir, lessons.INBOX)
     with snapshot.open_snapshot(base, "worktree") as snap:
         stale = len(check.stale_sections(snap, cfg, not a.no_exec))

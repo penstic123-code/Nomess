@@ -4,10 +4,21 @@
   "size": "small",
   "lang": "en",
   "systems": {},
+  "dream": {
+    "auto": true
+  },
   "docgen": {
     "nomess": {
       "file": "AGENTS.md",
       "builtin": "agents-entry"
+    },
+    "docs-index": {
+      "file": "docs/overview.md",
+      "builtin": "docs-index"
+    },
+    "lessons-index": {
+      "file": "docs/lessons/README.md",
+      "builtin": "lessons-index"
     }
   }
 }

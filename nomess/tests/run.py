@@ -258,7 +258,7 @@ def test_review2(tmp):
         expect(p.returncode == 2 and not os.path.exists(os.path.join(r, "CLAUDE.md")) and not os.path.exists(os.path.join(r, "docs", "system-map")),
                "非法表名应退出 2 且不写任何页: " + bad)
     # 7: 链接检查——URL 编码、尖括号、~~~ 围栏都不报;真断链仍报;记忆体检的 #锚点 不报
-    root = mkrepo(tmp, "r2link", {}, [("docs/my file.md", "x\n"), ("docs/ok.md",
+    root = mkrepo(tmp, "r2link", {}, [("docs/systems/my file.md", "x\n"), ("docs/systems/ok.md",
         "[a](my%20file.md) [b](<my file.md>) [c](my%20file.md#sec) [d](#top)\n~~~md\n[e](nope.md)\n~~~\n[f](missing.md)\n")])
     p = nm(root, "check", "--red", "--json")
     reds = json.loads(p.stdout)
@@ -559,12 +559,12 @@ def test_agents_entry(tmp):
     nm(root, "docgen")
     a = read(root, "AGENTS.md")
     body = a.split("<!-- GEN:agents BEGIN -->")[1].split("<!-- GEN:agents END -->")[0].strip().split("\n")
-    expect(len(body) <= 12 and "nomess lessons find" in a and "schedule.md" not in a, "小项目 agents-entry 不超 12 行且没有会话协议: %r" % a)
+    expect(len(body) <= 12 and "nomess lessons find" in a and "开工先读" not in a and "文档只放这些位置" in a, "小项目 agents-entry 不超 12 行、有“什么写在哪”、没有会话协议: %r" % a)
     put(root, "docs/schedule.md", "# 排期\n")
     nm(root, "docgen")
     a = read(root, "AGENTS.md")
     body = a.split("<!-- GEN:agents BEGIN -->")[1].split("<!-- GEN:agents END -->")[0].strip().split("\n")
-    expect("docs/schedule.md" in a and "log.md" not in a and len(body) <= 12, "大项目多一行会话协议(没有 log)")
+    expect("开工先读 `docs/schedule.md`" in a and "log.md" not in a and len(body) <= 12, "大项目多一行会话协议(没有 log)")
     expect(nm(root, "docgen", "--check").returncode == 0, "生成后 --check 应通过")
     put(root, "CLAUDE.md", "# 规矩\n")
     expect("黄 AGENTS2 CLAUDE.md" in nm(root, "check", "--all").stdout, "CLAUDE.md 没导入应报黄")
@@ -657,13 +657,13 @@ def golden_repo(tmp, lang):
     sysw, les = w["sys"], w["lesson"]
     root = mkrepo(tmp, "golden-" + lang, {
         "lang": lang, "systems": {"core": ["src/core/*"], "net": ["src/net/*"]},
-        "docgen": {"modules": {"file": "docs/design.md", "map": "modules"},
-                   "entry": {"file": "docs/design.md", "builtin": "agents-entry"}},
+        "docgen": {"modules": {"file": "docs/overview.md", "map": "modules"},
+                   "entry": {"file": "docs/overview.md", "builtin": "agents-entry"}},
         "map": {"modules": {"title": "Modules", "columns": ["name", "n"], "glob": "src/*/*.py", "regex": "REGISTER\\(\"(\\w+)\", (\\d+)\\)",
                             "file_col": True, "misses": "dynamic names", "hotspot": {"by": "name", "max": 1, "label": "registered twice"}}}},
         [("src/core/a.py", '# Core entry.\nREGISTER("alpha", 1)\n'),
          ("src/net/b.py", '# Network layer.\nREGISTER("beta", 2)\nREGISTER("alpha", 3)\n'),
-         ("docs/design.md", "# Design\n\n" + "".join("<!-- GEN:%s BEGIN -->\n<!-- GEN:%s END -->\n\n" % (n, n) for n in ("modules", "entry"))),
+         ("docs/overview.md", "# Design\n\n" + "".join("<!-- GEN:%s BEGIN -->\n<!-- GEN:%s END -->\n\n" % (n, n) for n in ("modules", "entry"))),
          ("docs/systems/core.md", "# core\n%s: the core\n%s: because\n%s: net\n" % sysw),
          ("docs/systems/net.md", "# net\n%s: the network\n%s: because\n%s: core\n\n## Pitfalls\n\n### Never block\n%s: x\n%s: y\n%s: %s\n"
           "%s: src/net/**\n%s: Never block the IO thread\n" % (sysw + (les[0], les[1], les[2], w["ok"], les[3], les[4]))),

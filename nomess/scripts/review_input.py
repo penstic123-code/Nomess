@@ -10,11 +10,19 @@ import subprocess
 
 import check
 import lessons
+import messages
 import nm_config
 import pathglob
 import rules as nm_rules
 import snapshot
 from messages import name as nm_name, t
+
+M = {
+    "RI_DOCTYPE": ("new doc_types entry: %s", "新增 doc_types 条目:%s"),
+    "RI_L6_SRC": ("L6 external-source lesson %r lost its source line", "L6 外部来源的教训 %r 被去掉了来源行"),
+    "RI_L6_OK": ("L6 external-source lesson %r was changed to verified", "L6 外部来源的教训 %r 的状态被改成已核实"),
+}
+messages.add(M)
 
 
 def main(argv):
@@ -32,8 +40,13 @@ def main(argv):
             print(res["skipped"])
             return 0
         diff = cand.diff(base)
-        cfg = nm_config.parse(cand.text(nm_config.CONFIG_NAME), nm_config.CONFIG_NAME)
-        entries = lessons.snapshot_entries(cand, nm_config.expanded(cfg)["lessons_dir"])
+        btext = base.text(nm_config.CONFIG_NAME)
+        bexp = nm_config.expanded(nm_config.parse(btext, nm_config.CONFIG_NAME) if btext else {})
+        cfg = nm_config.parse(cand.text(nm_config.CONFIG_NAME), nm_config.CONFIG_NAME)  # 后解析待检的:提示语按它的 lang
+        exp = nm_config.expanded(cfg)
+        entries = lessons.snapshot_entries(cand, exp["lessons_dir"])
+        new_types = [x for x in exp["doc_types"] if x not in bexp["doc_types"]]
+        l6 = _l6(base, bexp["lessons_dir"], cand, exp["lessons_dir"])
     if not diff:
         print(t("RI_EMPTY"))
         return 0
@@ -41,6 +54,8 @@ def main(argv):
     rv = res["review"]
     must = [t("RI_ALLOW", json.dumps(x, ensure_ascii=False)) for x in res["new_allow"]]
     must += [t("RI_FROZEN", r) for r in res["new_frozen"]]
+    must += [t("RI_DOCTYPE", json.dumps(x, ensure_ascii=False)) for x in new_types]
+    must += l6
     cmd_ids = [r["id"] for r in nm_config.expanded(cfg)["check"]["rules"] if "cmd" in r]  # 这次没执行 cmd 规则:新冻结的 cmd 规则号的 B1 无法核对,不当新违规
     for f in (f for f in res["findings"] if f["state"] == "loosen"):
         skipped = f["rule"] == "B1" and any(re.search(r"(?<![\w-])%s(?![\w-])" % re.escape(i), f["msg"]) for i in cmd_ids)
@@ -81,3 +96,23 @@ def main(argv):
 def _hits(paths, diff):
     matchers = [pathglob.compile(g).match for g in pathglob.split_globs(paths)]
     return any(m(p) for p in diff for m in matchers)
+
+
+def _externals(snap, d):
+    """教训库里的条目 -> {去空白小写的标题: (是否已核实, 是否外部来源, 标题)}。"""
+    return {re.sub(r"\s+", "", e["title"]).lower(): (e["verified"], lessons.is_external(e), e["title"])
+            for p in snap.ls(d, ".md") for e in lessons.parse_text(snap.text(p), p)}
+
+
+def _l6(base, bdir, cand, cdir):
+    """L6:基准里带外部来源的条目,在待检里被去掉来源行,或状态从非已核实变成已核实。条目整条删掉不算(没有转正)。"""
+    old, new = _externals(base, bdir), _externals(cand, cdir)
+    out = []
+    for k, (was_ok, ext, title) in old.items():
+        if ext and k in new:
+            ok, still, _ = new[k]
+            if not still:
+                out.append(t("RI_L6_SRC", title))
+            elif ok and not was_ok:
+                out.append(t("RI_L6_OK", title))
+    return out

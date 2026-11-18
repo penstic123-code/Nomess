@@ -1,8 +1,16 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {"type": "command", "command": "${user_config.python}", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session.py"]}
+        ]
+      }
+    ],
     "PreToolUse": [
       {
-        "matcher": "Bash|PowerShell",
+        "matcher": "Bash|PowerShell|Edit|Write",
         "hooks": [
           {"type": "command", "command": "${user_config.python}", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/guard.py"]}
         ]

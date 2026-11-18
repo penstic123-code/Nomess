@@ -21,10 +21,10 @@ def _lines(snap, rel):
 
 def system_pages(snap, cfg):
     names = list(cfg.get("systems", {}))
-    names += [posixpath.splitext(posixpath.basename(p))[0] for p in snap.ls("docs/systems", ".md")]
+    names += [posixpath.splitext(posixpath.basename(p))[0] for p in snap.ls(nm_config.docs_root(cfg) + "/systems", ".md")]
     out = []
     for name in dict.fromkeys(names):
-        rel = "docs/systems/%s.md" % name
+        rel = "%s/systems/%s.md" % (nm_config.docs_root(cfg), name)
         if not snap.isfile(rel):
             continue  # 说明页按需建,没有不报
         head = [l for l in _lines(snap, rel) if l.strip()][:12]
@@ -58,9 +58,14 @@ def snap_exists(snap, rel):
     return exists
 
 
-def broken_links(snap):
-    return [F("red", "DOC1", p, i, tgt, t("LINK_DEAD", tgt))
-            for p in snap.ls("docs", ".md", True) for i, tgt in dead_links(snap.text(p), snap_exists(snap, p))]
+def broken_links(snap, cfg):
+    """DOC1:项目文档根下的页红;开发者文档和对外文档也查(13.13)但只黄——它们不归 nomess 管,老项目升级后不该因此挡提交。"""
+    import doctypes
+    exp = nm_config.expanded(cfg)
+    tier = doctypes.tier_of(exp, doctypes.site_dir(snap))
+    ps = snap.ls(nm_config.docs_root(cfg), ".md", True) + [p for p in snap.ls("", ".md", True) if tier(p)]
+    return [F("yellow" if tier(p) else "red", "DOC1", p, i, tgt, t("LINK_DEAD", tgt))
+            for p in sorted(set(ps)) for i, tgt in dead_links(snap.text(p), snap_exists(snap, p))]
 
 
 def missing_headers(snap):
@@ -69,7 +74,7 @@ def missing_headers(snap):
 
 
 def unverified(snap, cfg):
-    d = cfg.get("lessons_dir", "docs/lessons")
+    d = nm_config.lessons_dir(cfg)
     n = sum(lessons.unverified_in(snap.text(p)) for p in snap.ls(d, ".md"))
     return [F("yellow", "L1", d, 0, "unverified", t("L1", n))] if n else []
 
@@ -87,27 +92,28 @@ def plan_head(text):
     return out
 
 
-def plans(snap):
-    """方案文件:docs/plans/ 下(含 archive/)的 .md。"""
-    return snap.ls("docs/plans", ".md", True)
+def plans(snap, cfg):
+    """方案文件:<docs_root>/plans/ 下(含 archive/)的 .md。"""
+    return snap.ls(nm_config.docs_root(cfg) + "/plans", ".md", True)
 
 
-def plan_links(snap):
+def plan_links(snap, cfg):
     """PLN1(红):方案头的“取代”“被取代”(NAMES["plan_head"] 里的 supersedes / superseded_by,其余键如“系统”不是文件)指向不存在的文件(相对方案文件所在目录)。"""
     out = []
-    for rel in plans(snap):
+    for rel in plans(snap, cfg):
         for k, v in plan_head(snap.text(rel)).items():
             if k in ("supersedes", "superseded_by") and v and not snap.isfile(posixpath.normpath(posixpath.join(posixpath.dirname(rel), v))):
                 out.append(F("red", "PLN1", rel, 1, "%s %s" % (k, v), t("PLN1", nm_name("plan_head", k), v)))
     return out
 
 
-def plan_status(snap):
+def plan_status(snap, cfg):
     """PLN2(黄):归档方案缺状态;写了“被取代”而状态不是“已被取代”。"""
     out = []
-    for rel in plans(snap):
+    archive = nm_config.docs_root(cfg) + "/plans/archive/"
+    for rel in plans(snap, cfg):
         h = plan_head(snap.text(rel))
-        if rel.startswith("docs/plans/archive/") and not h.get("status"):
+        if rel.startswith(archive) and not h.get("status"):
             out.append(F("yellow", "PLN2", rel, 1, "no status", t("PLN2_NONE")))
         if h.get("superseded_by") and h.get("status") != "superseded":
             out.append(F("yellow", "PLN2", rel, 1, "superseded", t("PLN2_SUP")))
@@ -129,17 +135,17 @@ def agents(snap):
 
 def map_index(snap, cfg):
     """MAP1(黄):系统图首页超预算(生成时已按固定顺序裁过,仍超说明别的部分太大)。"""
-    rel = nm_map.OUT_DIR + "/index.md"
+    rel = nm_map.out_dir(cfg) + "/index.md"
     if not snap.isfile(rel):
         return []
     budget, tok = cfg.get("map", {}).get("index_tokens", nm_map.INDEX_TOKENS), est_tokens("\n".join(_lines(snap, rel)))
     return [F("yellow", "MAP1", rel, 0, "big", t("MAP1", tok, budget))] if tok > budget else []
 
 
-def red(snap):
-    return broken_links(snap) + plan_links(snap)
+def red(snap, cfg):
+    return broken_links(snap, cfg) + plan_links(snap, cfg)
 
 
 def findings(snap, cfg):
-    return (system_pages(snap, cfg) + red(snap) + missing_headers(snap) + unverified(snap, cfg)
-            + plan_status(snap) + agents(snap) + map_index(snap, cfg))
+    return (system_pages(snap, cfg) + red(snap, cfg) + missing_headers(snap) + unverified(snap, cfg)
+            + plan_status(snap, cfg) + agents(snap) + map_index(snap, cfg))

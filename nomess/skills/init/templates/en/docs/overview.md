@@ -18,3 +18,8 @@ TBD: a few sentences explaining this diagram.
 ## Features
 
 - TBD
+
+## All documents
+
+<!-- GEN:docs-index BEGIN -->
+<!-- GEN:docs-index END -->

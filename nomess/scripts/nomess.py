@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""nomess 入口:只做子命令分发。  check | docgen | map | rules | lessons | status | doctor | review-input | refresh | hooks | git-hook。退出码:0 通过,1 有新红项/过时,2 运行故障(配置不对、超时、生成器失败、Python 版本不够)"""
+"""nomess 入口:只做子命令分发。  check | docgen | map | rules | lessons | status | doctor | review-input | refresh | hooks | git-hook | init | off | dream。退出码:0 通过,1 有新红项/过时,2 运行故障(配置不对、超时、生成器失败、Python 版本不够)"""
 import os
 import re
 import subprocess
@@ -12,8 +12,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from messages import t
 
-COMMANDS = ("check", "docgen", "map", "rules", "lessons", "status", "doctor", "review-input", "refresh", "hooks", "git-hook")
+COMMANDS = ("check", "docgen", "map", "rules", "lessons", "status", "doctor", "review-input", "refresh", "hooks", "git-hook", "init", "off", "dream")
 GITHOOK = ("refresh", "hooks", "git-hook")  # 这三个在 githook.py,入口名是 main_<命令>
+
+
+ALIAS = {"init": ("init_auto", "main"), "off": ("init_auto", "main_off")}  # 子命令名和模块名不一致的
 
 
 def main():
@@ -23,7 +26,7 @@ def main():
         print(t("USAGE", " | ".join(COMMANDS)))
         return 2
     cmd = sys.argv[1]
-    mod, fn = ("githook", "main_" + cmd.replace("-", "_")) if cmd in GITHOOK else (cmd.replace("-", "_"), "main")
+    mod, fn = ALIAS.get(cmd) or (("githook", "main_" + cmd.replace("-", "_")) if cmd in GITHOOK else (cmd.replace("-", "_"), "main"))
     import snapshot
     try:
         return getattr(__import__(mod), fn)(sys.argv[2:])

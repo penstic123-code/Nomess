@@ -86,4 +86,31 @@ icon('start', ({ gen, add, o, fill }) => {
   add(gen.circle(32, 26, 9, fill(MINT, { stroke: TEAL })));
   add(gen.path('M24 40 L16 50 L26 46 M40 40 L48 50 L38 46', fill(RED, { stroke: RED, strokeWidth: 2 })));
 });
+// install and forget: a gear turning by itself, with a check badge
+icon('auto', ({ gen, add, o, fill }) => {
+  const teeth = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
+    teeth.push(gen.line(28 + 15 * Math.cos(a), 30 + 15 * Math.sin(a), 28 + 21 * Math.cos(a), 30 + 21 * Math.sin(a), o({ stroke: TEAL, strokeWidth: 5 })));
+  }
+  teeth.forEach(add);
+  add(gen.circle(28, 30, 30, fill(MINT, { stroke: TEAL })));
+  add(gen.circle(28, 30, 11, fill(WHITE, { roughness: 0.5, strokeWidth: 2 })));
+  add(gen.circle(46, 46, 19, fill(WHITE, { stroke: TEAL, roughness: 0.6 })));
+  add(gen.path('M40 46 L44 50 L52 41', o({ stroke: TEAL, strokeWidth: 3.2 })));
+});
+// three doc tiers: full care / edit in place / read-only (lock)
+icon('tiers', ({ gen, add, o, fill }) => {
+  add(gen.rectangle(9, 14, 14, 36, fill(TEAL, { stroke: TEAL })));
+  add(gen.rectangle(25, 14, 14, 36, fill(MINT, { stroke: TEAL })));
+  add(gen.rectangle(41, 14, 14, 36, fill(WHITE)));
+  add(gen.rectangle(44, 33, 8, 7, fill(INK, { strokeWidth: 1.2, roughness: 0.5 })));
+  add(gen.path('M45.5 33 L45.5 30 C45.5 26 50.5 26 50.5 30 L50.5 33', o({ strokeWidth: 1.6, roughness: 0.5 })));
+});
+// why: speech bubble with a question mark
+icon('why', ({ gen, add, o, fill }) => {
+  add(gen.path('M12 14 L52 14 L52 42 L30 42 L20 52 L22 42 L12 42 Z', fill(WHITE)));
+  add(gen.path('M26 23 C26 16 38 16 38 23 C38 28 32 27 32 31', o({ stroke: RED, strokeWidth: 3.4 })));
+  add(gen.circle(32, 37, 2.6, fill(RED, { stroke: RED, strokeWidth: 1 })));
+});
 console.log('wrote icons to', OUT);

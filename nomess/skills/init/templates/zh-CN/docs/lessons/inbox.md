@@ -1,5 +1,5 @@
 # 教训 inbox
 
-只追加，由 `nomess lessons add 标题 -s 概述 -b 内容 [--unverified]` 写入；`/nomess:dream` 整理成主题文件。
+只追加，由 `nomess lessons add 标题 -s 概述 -b 内容 -k 别名 [--external 出处] [--unverified]` 写入；自动整理（`nomess:dream`）归进主题文件。
 每条：`## 标题` / `概述:` 何时适用（含路径和关键词）/ `状态:` 已核实或未核实 / `内容:` 怎么做、为什么、来源。
 只记从代码和 git 里看不出来的；不记会过期的状态。

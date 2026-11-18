@@ -201,6 +201,12 @@ def _cycles(sys_edges):
     return out
 
 
+def ownership(snap, cfg):
+    """{文件: 子系统}:和 model() 同一套归属,只是不算依赖边(DOC7 只要归属,边要扫全部源文件,贵)。"""
+    names = deps.all_files(snap)
+    return nm_map.owners_of(nm_map.systems_of(cfg, names)[0], names)
+
+
 def model(snap, cfg):
     """(owner {文件: 子系统}, 文件依赖边 {(源, 被依赖): 行}, 子系统间的边 {(a, b): [(源文件, 被依赖文件, 行)]}, 抽取表)。
     登记不对抛 ValueError。"""

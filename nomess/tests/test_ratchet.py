@@ -204,6 +204,14 @@ def t_unexecuted_rule_no_credit(tmp):
     expect(any(f["rule"] == "B1" and f["level"] == "red" for f in res["findings"]), "没执行的 C9 首次冻结:B1 红")
 
 
+def t_gate_disabled_first_freeze(tmp):
+    """合起来审查 1:钩子里给没启用的号(medium 没开 C4)写基线条目,不能借"钩子没跑它"跳过核对 -> 仍报 B1 红。"""
+    root = mkrepo(tmp, "gateoff", {"lang": "en"}, [("src/a.py", "ok\n")])
+    commit(root)
+    put(root, ".nomess-baseline.json", check.dump_baseline({"C4": {("red", (), ("whatever",)): ("n", 1)}}))
+    expect(any(f["rule"] == "B1" and f["level"] == "red" for f in gate(root)["findings"]), "钩子里没启用的 C4 首次冻结:B1 红")
+
+
 def t_glob_whitespace(tmp):
     """审查 2:给 scope 的 glob 加前导空格不改变具体度(解析时规范化一次)。"""
     import nm_config

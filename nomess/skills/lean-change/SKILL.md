@@ -1,12 +1,14 @@
 ---
 name: lean-change
 description: >-
-  Load before coding, fixing bugs, refactoring, adding features, choosing dependencies or designing: smallest complete change by three questions, look it up when unsure, fix root causes, no patches or defensive code.
+  Load before coding, fixing bugs, refactoring, adding features, choosing dependencies or designing: smallest complete change by three questions, most likely cause first (not exhaustive), look it up when unsure, fix root causes, no patches or defensive code.
 ---
 
 # lean-change: smallest complete change
 
 Lazy in the solution, never lazy in the reading: understand first, look for what exists first, then write the least code. Below, `nomess.py` means `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`, run from the project root.
+
+**Most likely first, never exhaustive.** Read the code and logs, deduce the single most likely cause or approach, and verify it the cheapest way; if right, stop; if wrong, take the next most likely. Don't try every possibility up front or rerun hoping for luck. Same for tests: test only where it is most likely to break and edges hard to reason about; what the code shows needs no test. Three rounds on one problem without a conclusion: stop and hand back the known facts, what was ruled out, and the most likely next direction.
 
 ## 1. Understand first
 
@@ -43,18 +45,18 @@ How: official docs and specs → source of mature open-source implementations �
 
 - Write tests only for edge behavior that is hard to deduce correctly from the code and easy to regress. What reading the code can confirm goes into the handback as "confirmed by reading code: file:line", with no test.
 - One test checks one thing. No timing assertions. Don't test implementation details or cover the same behavior twice.
-- During development run only the tests you changed; run the full suite once before handing back. Whether the logic is right is mostly judged by review.
-- If the project has its own testing rules (in `AGENTS.md`, `CLAUDE.md` or its docs), follow them instead of this section.
+- During development run only the tests your change touches. The full suite is not run per package: it runs once after a batch is merged (if there is CI, CI counts). Whether the logic is right is mostly judged by review.
+- Project testing rules (`AGENTS.md`, `CLAUDE.md`, its docs) override this section.
 
 ## 6. Debugging
 
-What can be deduced from code and existing data, deduce; don't schedule measurements. Propose the single most likely cause, verify it the cheapest way, then move to the next if it fails. Fix every problem found by default; only "extremely rare + fix touches many places" gets "suggest recording as a known issue". Three rounds on one problem without a conclusion: stop and hand back known facts, what was ruled out, and the next direction.
+Fix every problem found by default; only "extremely rare + fix touches many places" gets "suggest recording as a known issue".
 
 ## 7. Commit and hand back
 
-The commit runs `nomess check` in a git hook. Blocked by red: fix it, or add a top-level `allow` with a reason to `nomess.json` and name it in the handback; never `--no-verify`.
+The commit hook runs `nomess check`. Blocked by red: fix it, or add a top-level `allow` with a reason to `nomess.json` and name it in the handback.
 
-Before the last commit, record what code and git don't show: `nomess.py lessons add "<title>" -s "<when it applies: files, keywords>" -b "<what to do, why, source>" --unverified`, so the entry goes into that commit. Same title overwrites the old entry.
+Before the last commit, record what code and git don't show: `nomess.py lessons add "<title>" -s "<when it applies: files, keywords>" -b "<what to do, why, source>" -k "<aliases: Chinese and English, common wordings>" --unverified`, so the entry goes into that commit. Always give `-k`: it is how others find the entry. Learned from a web page, someone else's doc or tool output: add `--external "<URL or file>"`. Something worth recording has no doc type, or what you needed was written nowhere: title it `Doc gap: …`.
 
 The handback carries these lines (add `Looked up: <link>` only when what you found changed the decision):
 
@@ -63,4 +65,4 @@ Tests: <added ones → which acceptance item each covers>; confirmed by reading 
 ```
 
 ---
-Sources: the questions (distilled from ponytail's decision ladder), listing every place the change must reach, the never-cut list and the `shortcut:` comment are borrowed from ponytail (github.com/DietrichGebert/ponytail, MIT, skills/ponytail/SKILL.md). When you must look it up, the defensive-code test, deduction before measurement, the test rules and the handback lines are added by this plugin.
+Sources: the questions (distilled from ponytail's decision ladder), listing every place the change must reach, the never-cut list and the `shortcut:` comment are borrowed from ponytail (github.com/DietrichGebert/ponytail, MIT, skills/ponytail/SKILL.md). When you must look it up, the defensive-code test, most likely first, the test rules and the handback lines are added by this plugin.

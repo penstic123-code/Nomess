@@ -1,6 +1,6 @@
 """按路径加载的规则文件:从教训条目和系统页“坑”段里带 `路径:` 和 `规则:` 的条目生成 .claude/rules/nomess/<标识>.md。
 规则文件只是条目的视图,全部生成、不手改;一个事实只有一个家(那条教训 / 那条坑)。  nomess rules [--check]
-条目:教训库里除 inbox 外各页的 `## 标题`,和 docs/systems/*.md 里 `## 坑`(或 `## Pitfalls`)段下的 `### 标题`;
+条目:教训库里除 inbox 外各页的 `## 标题`,和 <docs_root>/systems/*.md 里 `## 坑`(或 `## Pitfalls`)段下的 `### 标题`;
   键同教训条目(见 lessons.py),这里用 `路径:`(逗号分隔的 glob,花括号里的逗号不算)和 `规则:`(一句话,中文 40 字 / 英文 25 词内)。
   只有状态明确是已核实、路径和规则都写了、glob 都支持的才生成。
 归类:路径集合相同的条目进同一个文件,文件的 paths 就是条目自己写的 glob(不扩大适用范围);文件名是这组 glob 的哈希前 8 位
@@ -50,19 +50,19 @@ def pitfalls(text, name):
 def entries(snap, cfg):
     """[(相对项目根的文件, 条目)]:教训库(不含 inbox)和系统页“坑”段里所有条目,按文件、行号排。"""
     out = []
-    ldir = cfg.get("lessons_dir", "docs/lessons")
+    ldir = nm_config.lessons_dir(cfg)
     for p in snap.ls(ldir, ".md"):
         if posixpath.basename(p) != lessons.INBOX:
             out += [(p, e) for e in lessons.parse_text(snap.text(p), posixpath.basename(p))]
-    for p in snap.ls("docs/systems", ".md"):
+    for p in snap.ls(nm_config.docs_root(cfg) + "/systems", ".md"):
         out += [(p, e) for e in pitfalls(snap.text(p), posixpath.basename(p))]
     return out
 
 
 def why_not(e):
     """条目为什么不生成规则:None = 生成;"skip" = 本来就不生成(路径和规则都没写);
-    其余要提示:"half" 只写了一个,"unverified" 状态不是已核实,"glob" 有不支持的 glob。"""
-    if not (e["paths"] or e["rule"]):
+    外部来源的条目也是 "skip";其余要提示:"half" 只写了一个,"unverified" 状态不是已核实,"glob" 有不支持的 glob。"""
+    if not (e["paths"] or e["rule"]) or lessons.is_external(e):  # 外部来源永不进规则文件(哪怕被改成已核实)
         return "skip"
     if not (e["paths"] and e["rule"] and pathglob.split_globs(e["paths"])):
         return "half"

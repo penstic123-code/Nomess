@@ -2,8 +2,8 @@
  "en": {
   ".claude/rules/nomess/009ec578.md": "44c1bc9170ae49682bfe8b28e597de7f97722a2f954b13fddfd8c65489a31e66",
   ".gitignore": "50692927ff96d0068ec5bc90a5f2c9cddbcc17967fd00f3fb01258d7939680ea",
-  "docs/design.md": "978848cdb65e2b14493e5b9910638d5737abaf28e1a726ea8921d0ea5aeeff43",
   "docs/lessons/core.md": "1d9aa12e7a4d51c719d3caa8d8d642748faa943de51aad2fc6aa8a539190eac6",
+  "docs/overview.md": "057daa25caeca5a789b28f3682fffff9c44e1db41be93ec3006ee514af3fa701",
   "docs/plans/archive/old.md": "1813eec4d42596b976b34bbf8f2dc0b1bbd331421f6401a93b8e26e74a2c88f0",
   "docs/plans/new.md": "9010f336e5c216664e88442198a34749b6b8b756b7f18be45a940957a9c8a2f7",
   "docs/schedule.md": "f37d2e0aed194b1222d9d2f666c352fedf56c373b171fbef74beff497d53c2e4",
@@ -13,15 +13,15 @@
   "docs/system-map/modules.md": "24beb203b437c42a6871cf25d2fd18ecb07a824f09f0e1c5fd30045b2b4388d2",
   "docs/systems/core.md": "51d4b7f7e1dc6729d6716f1c0f05cb653028c66b5b99cfb79fd415efbe079f0f",
   "docs/systems/net.md": "d1ee0ac5f6d01d8a47bab7ab3569e2bd4233c49ff2b16fe2f55f7968b1c2f575",
-  "nomess.json": "55f1de0fcb41b7425e5fb6784d9001fa1ff208a358878943a0e4b27b63781b1a",
+  "nomess.json": "c2b142b80b20f10c95f5bece595a0364d198234bdba7e9010ec6f27eeec22cfb",
   "src/core/a.py": "aaea3212c9b632fe86b7bde68c0fb1e401698f72959f3c05161f7877cef803a4",
   "src/net/b.py": "1a14dfabb5ef2f2e0c7855f12084f99a6d19a5dca716910293b208992c75ddac"
  },
  "zh-CN": {
   ".claude/rules/nomess/009ec578.md": "ad0042a2766f3f966abd7ff255b06c91bd11bde83a8a561f91c675235605426a",
   ".gitignore": "50692927ff96d0068ec5bc90a5f2c9cddbcc17967fd00f3fb01258d7939680ea",
-  "docs/design.md": "fded0a1456556f5158d3326ce45c1299c1e8a5e47993435f41d9ec9bf58ccb14",
   "docs/lessons/core.md": "6869ec845b816160e785e88e28daec4ae480a9f87b42e960a2b077929c59ef42",
+  "docs/overview.md": "cf63b6d9e1020df916d55955e7ed13a00c7c05b02e2b3f411a0866ed3d9a1098",
   "docs/plans/archive/old.md": "3d41a1369d5e168afcf1c1bd87929e6697df0fbd1f7c248fd91bd731d8a6fd28",
   "docs/plans/new.md": "5826ad3a82d057a3cacb435a62f3a579fcf1470f3d62ec54629454fa9a8dcfd2",
   "docs/schedule.md": "e86f2f2cdc7fa61c50fa774216df490a5fd690890fd54e0c08780e62995bbfa2",
@@ -31,7 +31,7 @@
   "docs/system-map/modules.md": "387e6c9b25844f2cd0095ec9579a19ddefe68f23814baa99d2fe580102ecfbda",
   "docs/systems/core.md": "ede4934f991f245787e9ed956010be4f67ff6eaf7cfcdaa49852ecce1de5362d",
   "docs/systems/net.md": "f87ce2003aba4dcb1c7e889becdf2087c0f43c98072675f04ae9c4e4724e1d05",
-  "nomess.json": "3a197a9ff9d05bc0d9360a53d880a4f77e4730959484aa95a427545d82371559",
+  "nomess.json": "f36ce6fcaed6f035758acc9d65c464dd92b11dee04512f42de0d7135ffb05ae1",
   "src/core/a.py": "aaea3212c9b632fe86b7bde68c0fb1e401698f72959f3c05161f7877cef803a4",
   "src/net/b.py": "1a14dfabb5ef2f2e0c7855f12084f99a6d19a5dca716910293b208992c75ddac"
  }

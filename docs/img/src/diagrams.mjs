@@ -162,7 +162,7 @@ D['memory-loop'] = (L) => {
   g.arrow([n2.b, n3.t], { sw: 1.8 });
   g.arrow([n3.l, n4.r], { sw: 1.8 });
   g.arrow([[90, 216], [90, 104]], { sw: 1.8, label: L('新经验', 'new lessons'), at: [100, 166], anchor: 'start', labelColor: C.gray });
-  g.chip(196, 112, L('开发记忆', 'dev memory'), { size: 13, tone: 'gray' });
+  g.chip(196, 112, L('教训库', 'lessons'), { size: 13, tone: 'gray' });
   g.chip(614, 112, L('项目文档', 'project docs'), { size: 13, tone: 'gray' });
   g.chip(538, 288, L('路径规则', 'path rules'), { size: 13, tone: 'gray' });
   g.text(380, 168, L('项目长期记忆', 'Long-term project memory'), { size: 18, weight: 700, color: C.accent, anchor: 'middle' });
@@ -264,6 +264,55 @@ D['flow-tiers'] = (L) => {
     const r = g.box(530, y, 200, 56, res, { tone, weight: 700, size: 15 });
     g.arrow([c.r, r.l], { sw: 1.4 });
   });
+  return g;
+};
+
+// 1.1: install and forget. Top row left to right, then down and back along the bottom.
+D['autopilot'] = (L) => {
+  const g = canvas(320);
+  const n1 = g.box(24, 52, 96, 60, L('安装', 'Install'), { weight: 700, size: 16 });
+  const n2 = g.box(156, 52, 168, 60, L('第一次改东西\n自动启用', 'First change:\nswitches on'), { tone: 'accent', weight: 700, size: 15 });
+  const panel = g.box(360, 24, 376, 116, '', { tone: 'plain', fill: '#f4faf8' });
+  g.text(panel.cx, 54, L('日常开发', 'Everyday work'), { size: 16, weight: 700, anchor: 'middle', halo: false });
+  const chips = [L('查教训', 'look up lessons'), L('记教训', 'record lessons'), L('提交检查', 'commit check')];
+  const size = L(14, 12), gap = 12;
+  const ws = chips.map((c) => g.tw(c, size) + 18);
+  let x = panel.cx - (ws.reduce((a, b) => a + b, 0) + gap * (chips.length - 1)) / 2;
+  chips.forEach((c, i) => { g.chip(x, 84, c, { size, tone: 'gray' }); x += ws[i] + gap; });
+  g.arrow([n1.r, n2.l], { sw: 1.8 });
+  g.arrow([n2.r, [panel.x, n2.cy]], { sw: 1.8 });
+  const n4 = g.box(476, 204, 220, 64, L('攒够了\n后台自动整理', 'Enough piled up:\ntidy in background'), { tone: 'accent', weight: 700, size: 15 });
+  g.arrow([[n4.cx, panel.y + panel.h], n4.t], { sw: 1.8, label: L('最多一天一次', 'at most once a day'), at: [n4.cx + 12, 180], anchor: 'start', labelColor: C.gray });
+  const n5 = g.box(156, 204, 220, 64, L('一句话告诉你', 'One sentence\nto tell you'), { tone: 'solid', weight: 700, size: 16 });
+  g.arrow([n4.l, n5.r], { sw: 1.8 });
+  g.box(L(206, 191), 278, L(120, 150), 28, L('一条命令撤回', 'one-command undo'), { size: L(13, 12), tone: 'red' });
+  g.arrow([[n5.cx, n5.y], [n5.cx, 168], [410, 168], [410, panel.y + panel.h + 2]], { sw: 1.4, dashed: true, color: C.gray, label: L('接着干活', 'keep working'), at: [n5.cx - 10, 160], anchor: 'end', labelColor: C.gray });
+  return g;
+};
+
+// 1.1: three doc tiers, Nomess touches less from left to right
+D['doc-tiers'] = (L) => {
+  const g = canvas(330);
+  const cols = [
+    [L('项目文档', 'Project docs'), 'solid', L('总览 · 系统页 · 方案\n排期 · 教训', 'overview · systems · plans\nschedule · lessons'),
+      L('全管', 'Full care'), L('归类 · 合并 · 归档 · 拆分', 'sort · merge · archive · split'), 'ok'],
+    [L('开发者文档', 'Developer docs'), 'accent', L('CONTRIBUTING\n搭环境 · 跑测试', 'CONTRIBUTING\nsetup · running tests'),
+      L('就地改', 'Edit in place'), L('只改过时说法，不挪不删', 'stale wording only, no moves'), 'ok'],
+    [L('对外文档', 'Public docs'), 'gray', L('README · CHANGELOG\n文档网站', 'README · CHANGELOG\ndocs site'),
+      L('只读', 'Read-only'), L('绝不自动改，只提醒', 'never edited, only flagged'), 'no'],
+  ];
+  cols.forEach(([name, tone, ex, act, detail, m], i) => {
+    const x = 28 + i * 240;
+    g.box(x, 24, 224, 50, name, { tone, weight: 700, size: 17 });
+    g.text(x + 112, 106, ex, { size: 14, anchor: 'middle', color: C.gray, halo: false });
+    g.box(x, 168, 224, 92, '', { tone: 'plain', dashed: true, sw: 1.2 });
+    g.mark(x + 30, 196, m, 0.8);
+    g.text(x + 52, 203, act, { size: 17, weight: 700, color: m === 'ok' ? C.accent : C.red, halo: false });
+    g.text(x + 112, 240, detail, { size: L(14, 13), anchor: 'middle', halo: false });
+    g.arrow([[x + 112, 146], [x + 112, 166]], { sw: 1.2, color: C.gray });
+  });
+  g.arrow([[60, 296], [700, 296]], { sw: 1.6, color: C.gray, dashed: true });
+  g.text(380, 288, L('Nomess 动得越来越少', 'Nomess touches less and less'), { size: 14, anchor: 'middle', color: C.gray });
   return g;
 };
 

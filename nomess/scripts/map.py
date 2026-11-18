@@ -1,4 +1,4 @@
-"""系统图:生成 docs/system-map/ 下的首页和分页,全部生成、不手改。
+"""系统图:生成 <docs_root>/system-map/ 下的首页和分页,全部生成、不手改。
   index.md  分页链接 / 重叠热点清单(末行"屎山存量 N")/ 每个子系统一行 / 子系统依赖图(Mermaid)
   files.md  文件清单(git ls-files + 头注释第一句)      deps.md  仓库内文件依赖(六种语言,内置)
   <表名>.md 每个 nomess.json "map" 抽取表一页:标题 + 列名 + 文件 glob + 正则(每个捕获组一列,每处匹配一行)+ 会漏什么;
@@ -40,8 +40,13 @@ M = {
 }
 messages.add(M)
 
-OUT_DIR = "docs/system-map"
 RESERVED = ("index", "files", "deps")
+
+
+def out_dir(cfg):
+    """系统图目录:<docs_root>/system-map(生成物跟项目文档在一个根下)。"""
+    return nm_config.docs_root(cfg) + "/system-map"
+
 INDEX_TOKENS = 1500    # 首页预算缺省值
 HOT_KEEP = 10          # 超预算时热点清单留这么多条
 
@@ -175,10 +180,10 @@ def _hotspots(snap, cfg, es, linked):
     return out
 
 
-def _system_line(snap, name, derived):
-    page = snap.text("docs/systems/%s.md" % name)
+def _system_line(snap, cfg, name, derived):
+    page = snap.text("%s/systems/%s.md" % (nm_config.docs_root(cfg), name))
     if page is None:
-        return "- **%s**" % name if derived else t("MAP_SYS_NOPAGE", name, name)
+        return "- **%s**" % name if derived else t("MAP_SYS_NOPAGE", name, nm_config.docs_root(cfg), name)
     m = re.search(r"^(?:%s)[:：]\s*(.+)$" % "|".join(alts("system_head", "what")), page, re.M)
     return t("MAP_SYS_LINE", name, m.group(1).strip() if m else t("MAP_SYS_NOWHAT"), name)
 
@@ -218,13 +223,14 @@ def pages(snap, cfg):
     systems, derived = systems_of(cfg, names)
     owner = owners_of(systems, names)
     linked = exp["size"] != "small"
+    od = out_dir(cfg)
     out = {}
     if linked:
         budget = exp["map"]["page_tokens"]
-        out = {OUT_DIR + "/files.md": _files_page(snap, files, budget), OUT_DIR + "/deps.md": _deps_page(es, owner, budget)}
+        out = {od + "/files.md": _files_page(snap, files, budget), od + "/deps.md": _deps_page(es, owner, budget)}
         for name in tables:
-            out["%s/%s.md" % (OUT_DIR, name)] = generate(snap, cfg, name)
-    out[OUT_DIR + "/index.md"] = _index(snap, cfg, tables if linked else {}, es, systems, derived, owner, linked)
+            out["%s/%s.md" % (od, name)] = generate(snap, cfg, name)
+    out[od + "/index.md"] = _index(snap, cfg, tables if linked else {}, es, systems, derived, owner, linked)
     return out
 
 
@@ -248,7 +254,7 @@ def _index(snap, cfg, tables, es, systems, derived, owner, linked):
             idx.append("")
         idx += [t("MAP_IDX_HOT")] + (hot_lines or [t("MAP_IDX_NONE")]) + [debt]
         if systems:
-            idx += ["", t("MAP_IDX_SYS")] + [_system_line(snap, n, derived) for n in systems]
+            idx += ["", t("MAP_IDX_SYS")] + [_system_line(snap, cfg, n, derived) for n in systems]
             idx += ["", t("MAP_IDX_SYSDEPS"), _mermaid(systems, owner, es, only_linked)]
         return "\n".join(idx)
 
@@ -273,22 +279,23 @@ def plan(snap, cfg):
         old = snap.text(rel)
         if old is None or not docgen.same(old, text):
             out[rel] = text.encode("utf-8")
-    out.update(dict.fromkeys(p for p in snap.ls(OUT_DIR, ".md") if p not in new))
+    out.update(dict.fromkeys(p for p in snap.ls(out_dir(cfg), ".md") if p not in new))
     return out
 
 
 def main(argv):
     import argparse
-    ap = argparse.ArgumentParser(prog="nomess map", description="generate the docs/system-map/ index and pages")
+    ap = argparse.ArgumentParser(prog="nomess map", description="generate the <docs_root>/system-map/ index and pages")
     ap.add_argument("--check", action="store_true", help="compare only, do not write; exit 1 if any page is stale")
     a = ap.parse_args(argv)
     config = nm_config.find_config()
     base = os.path.dirname(config)
     with snapshot.open_snapshot(base, "worktree") as snap:
-        changed = plan(snap, nm_config.load(config))
+        cfg = nm_config.load(config)
+        changed = plan(snap, cfg)
     if not a.check:
         outwrite.apply(base, changed)
-        outwrite.prune_empty(base, OUT_DIR)
+        outwrite.prune_empty(base, out_dir(cfg))
     for rel in changed:
         print("%s %s" % (t("STALE") if a.check else t("WRITTEN"), rel))
     return 1 if a.check and changed else 0

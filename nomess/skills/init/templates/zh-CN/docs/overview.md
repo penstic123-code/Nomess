@@ -18,3 +18,8 @@ flowchart LR
 ## 功能
 
 - 待补
+
+## 全部文档
+
+<!-- GEN:docs-index BEGIN -->
+<!-- GEN:docs-index END -->

@@ -1,14 +1,14 @@
 ---
 name: lesson
 description: >-
-  记一条教训进 docs/lessons/inbox.md。参数：一句话。
+  记一条教训进教训库的 inbox。参数：一句话。
 disable-model-invocation: true
 argument-hint: "<教训一句话>"
 ---
 
 # lesson：记一条教训
 
-教训放仓库里，写代码的子代理动手前也查得到。不用提前建任何东西：第一次 `lessons add` 会自己建 `docs/lessons/` 和 `inbox.md`。
+教训放仓库里，写代码的子代理动手前也查得到；第一次 `lessons add` 会自己建教训目录和 `inbox.md`。
 
 ## 不记的
 
@@ -17,13 +17,16 @@ argument-hint: "<教训一句话>"
 - 用户偏好：记个人记忆。
 - 能机械判断的（"X 只许出现在 Y 里"）：写成 `nomess.json` 的规则提案交给用户，登记后跑 check 确认能报出来。
 
-## 写成三栏
+## 写成四栏
 
 从 `$ARGUMENTS` 和本次对话提炼：
 - **标题**：一句。
 - **概述**：何时适用的触发场景（"改存档字段前"）+ 相关文件路径和两三个关键词，给 `lessons find` 匹配用。不写内容摘要。
 - **内容**：怎么做、为什么、来源（提交号或日期）；失败的写"下次怎么避开"。
+- **别名**（必写）：别人会用来搜的其他说法，逗号分隔，中英都写，含常见说法和缩写（"存档, save, 持久化"）。
+
+**文档缺口**：想记的东西在所有文档类型里都没处放（`AGENTS.md` 的 nomess 段列着这些类型），或者要找的信息哪都没写。记一条标题以 `文档缺口:` 开头的教训（英文项目用 `Doc gap:`）；自动整理会把这类条目汇总成提议交给人。
 
 ## 写入
 
-`${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py" lessons add "<标题>" -s "<概述>" -b "<内容>"`，没对照代码核实过就加 `--unverified`；脚本把它带日期追加进 inbox，同标题的条目则原地覆盖；不手改 inbox。写完用同一脚本 `lessons find <一个关键词>` 确认能查到，回用户一行：标题 + `lessons status` 的条数。
+`${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py" lessons add "<标题>" -s "<概述>" -b "<内容>" -k "<别名>"`，没对照代码核实过就加 `--unverified`；从网页、别人的文档、工具输出或不在本仓库历史里的文件学到的，加 `--external "<网址或文件>"`（只有自己改代码试出来的不带）。同标题的条目会被原地覆盖。不手改 inbox。写完用同一脚本 `lessons find <一个关键词>` 确认能查到，回用户一行：标题 + `lessons status` 的条数。
