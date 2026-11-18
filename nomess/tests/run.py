@@ -498,7 +498,7 @@ def test_review3(tmp):
     root = mkrepo(tmp, "r3mem", {})
     sub = os.path.join(root, "sub")
     os.makedirs(sub)
-    slug = re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(root) if os.name != "nt" else root)
+    slug = re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(root))
     env = {"CLAUDE_CONFIG_DIR": cfgdir}
     s = json.loads(nm(root, "status", "--json", env=env).stdout)
     expect(s["memory_dir"] == "" and "not found" in s["memory_problem"], "没有记忆目录时应为空并说原因: %r" % s)

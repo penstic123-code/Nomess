@@ -3,7 +3,6 @@
 存 <仓库根>/.nomess/cache/<sha1(json [kind, version])>.json,内容 {"kind", "version", "facts": {对象名: 值}};.nomess/ 不进快照清单。
 不加锁:进程退出时原子替换,后写的覆盖先写的;任何读写错误只当没命中(缓存可随时整个删掉)。不回收、不删别的版本。"""
 import atexit
-import copy
 import hashlib
 import json
 import os
@@ -43,26 +42,36 @@ def _store(root, kind, version):
     return _stores[k]
 
 
+def _copy(v):
+    """JSON 值的深拷贝(只有 dict / list / 标量,比 copy.deepcopy 快得多)。"""
+    t = type(v)
+    if t is list:
+        return [_copy(x) for x in v]
+    if t is dict:
+        return {k: _copy(x) for k, x in v.items()}
+    return v
+
+
 def facts(snap, path, kind, version, fn):
     """fn(text) 的结果,text = 文件字节按 UTF-8 解码(非法字节替换)、\\r\\n 换成 \\n。fn 的结果若还依赖文本以外的东西(扩展名、配置),
     要写进 kind 或 version。读不到(不是普通文件)返回 None,不调 fn、不写缓存。值必须能存成 JSON;没命中时返回的也是 JSON 往返后的值,
-    命中与否类型一致;返回的是副本,调用者改了不影响缓存。索引 / 树快照命中时不读文件;工作区 / 叠加内容只读一次,同一份字节既算键又交给 fn。"""
+    命中与否类型一致;返回的是副本,调用者改了不影响缓存。有对象名的(索引 / 树,工作区里相对索引没改过的已跟踪文件)命中时不读文件;其余工作区 / 叠加内容只读一次,同一份字节既算键又交给 fn。"""
     version = str(version)
     st = _store(snap.root, kind, version)
     key = snap.oid(path)
     if key is not None and key in st[0]:
-        return copy.deepcopy(st[0][key])
+        return _copy(st[0][key])
     data = snap.read(path)
     if data is None:
         return None
     if key is None:
         key = snapshot.blob_hash(data)
         if key in st[0]:
-            return copy.deepcopy(st[0][key])
+            return _copy(st[0][key])
     v = json.loads(json.dumps(fn(data.decode("utf-8", "replace").replace("\r\n", "\n")), ensure_ascii=False))
     st[0][key] = v
     st[1] = True
-    return copy.deepcopy(v)
+    return _copy(v)
 
 
 @atexit.register

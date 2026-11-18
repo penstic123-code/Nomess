@@ -51,6 +51,8 @@ def put(root, rel, text, mode="w"):
     else:
         with open(p, mode, encoding="utf-8", newline="\n") as f:
             f.write(text)
+    if isinstance(text, str) and text.startswith("#!"):
+        os.chmod(p, 0o755)  # POSIX 上 git 不跑没有执行位的钩子;脚本一律给执行位
     return p
 
 

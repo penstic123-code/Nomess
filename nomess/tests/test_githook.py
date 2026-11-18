@@ -44,6 +44,8 @@ def w(root, rel, text, mode="w"):
     os.makedirs(os.path.dirname(p), exist_ok=True)
     with open(p, mode, encoding=None if "b" in mode else "utf-8", newline=None if "b" in mode else "\n") as f:
         f.write(text)
+    if text.startswith("#!"):
+        os.chmod(p, 0o755)  # POSIX 上 git 不跑没有执行位的钩子
 
 
 def r(root, rel):

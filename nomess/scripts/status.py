@@ -62,7 +62,7 @@ def memory_location(base):
         d, source = os.path.join(claude_dir(), "projects", os.environ["CLAUDE_CODE_PROJECT_DIR_NAME"], "memory"), "CLAUDE_CODE_PROJECT_DIR_NAME"
     else:
         projects = os.path.join(claude_dir(), "projects")
-        slug = re.sub(r"[^A-Za-z0-9]", "-", root)
+        slug = re.sub(r"[^A-Za-z0-9]", "-", os.path.realpath(root))
         have = os.listdir(projects) if os.path.isdir(projects) else []
         hits = [n for n in have if n == slug] or ([n for n in have if n.lower() == slug.lower()] if os.name == "nt" else [])
         source = "projects/<%s>" % root.replace("\\", "/")

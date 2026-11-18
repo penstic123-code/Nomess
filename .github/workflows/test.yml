@@ -13,6 +13,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.9", "3.x"]
+        exclude:  # ubuntu-latest no longer ships Python 3.9
+          - {os: ubuntu-latest, python: "3.9"}
+        include:
+          - {os: ubuntu-22.04, python: "3.9"}
     steps:
       # Keep LF on Windows so generated files compare byte for byte with the golden hashes.
       - name: Keep line endings as in the repository
