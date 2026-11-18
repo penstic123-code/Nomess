@@ -34,8 +34,6 @@ add(gen.ellipse(91, 55, 14, 20, fur('#d8a28d', { strokeWidth: 1 })));
 add(gen.ellipse(165, 55, 14, 20, fur('#d8a28d', { strokeWidth: 1 })));
 // head: round top, chubby cheeks low on the sides, small chin
 add(gen.path('M128 46 C158 46 178 62 182 86 C196 96 198 122 186 134 C174 146 152 152 128 152 C104 152 82 146 70 134 C58 122 60 96 74 86 C78 62 98 46 128 46 Z', fur(HEAD)));
-// pale chin only (no round muzzle disc)
-add(gen.path('M108 134 C116 146 140 146 148 134 C142 140 114 140 108 134 Z', fur(PALE, { strokeWidth: 0.8, roughness: 0.5 })));
 // big dark eyes set wide
 add(gen.circle(98, 96, 22, fur('#1f1610', { strokeWidth: 1 })));
 add(gen.circle(158, 96, 22, fur('#1f1610', { strokeWidth: 1 })));
