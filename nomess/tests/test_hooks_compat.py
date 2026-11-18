@@ -152,7 +152,7 @@ def t_worktree(tmp):
     git(root, "worktree", "add", "-q", "-b", "other", wt2)
     out = nomess(root, "doctor").stdout
     bad = [l for l in out.splitlines() if "not wired" in l]
-    expect(len(bad) == 1 and wt2.replace("\\", "/") in bad[0], "③ 相对 hooksPath:doctor 应单独报第二个 worktree 没接入: %r" % out)
+    expect(len(bad) == 1 and os.path.realpath(wt2).replace("\\", "/") in bad[0], "③ 相对 hooksPath:doctor 应单独报第二个 worktree 没接入: %r" % out)
     expect("git hooks wired" in out, "③ 相对 hooksPath:第一个 worktree 接了应报接入: %r" % out)
 
 
