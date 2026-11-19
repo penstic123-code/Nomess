@@ -2,6 +2,19 @@
 
 Versions follow [Semantic Versioning](https://semver.org/). Each release has three parts: Added, Changed, Fixed; breaking changes come first, with migration steps.
 
+## 1.2.0 – 2026-11-19
+
+### Added
+
+- Projects choose their own document types. Two new `nomess.json` keys, both defaulting to the old behaviour (a config without them works exactly as in 1.1.1):
+  - `"builtin_doc_types": false` uses only the `doc_types` list. Entries can now be `{name, what, dir}` or `{name, what, file}`, and may take a `role` (`overview`, `systems`, `schedule`, `plans`, `ownership`) to keep that built-in job: the docs index hangs on the `overview` entry (required), the system map links to pages in the `systems` folder, the schedule and plan checks read the `schedule` file and `plans` folder. A job with no entry is skipped silently. The lessons library and the system map always exist.
+  - `"doc_places": "free"` stops blocking and flagging docs outside the type locations (DOC4 and the on-the-spot block); such pages are listed under "Unsorted" in the docs index. Good for experiments.
+- `nomess init --auto --docs standard|free|custom`. `custom` writes `builtin_doc_types: false` with the five editable built-in types spelled out, ready to delete, rename or move. When nomess is not enabled yet, the session hook now has the AI ask the user one question about this first.
+
+### Changed
+
+- Moving to `doc_places: free`, to `builtin_doc_types: false`, or removing / relocating a `doc_types` entry counts as a loosening (B2), like changing `docs_root`.
+
 ## 1.1.1 – 2026-11-19
 
 ### Changed

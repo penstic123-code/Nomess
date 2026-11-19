@@ -30,7 +30,7 @@ model: sonnet
 - **文档缺口**（标题以 `Doc gap:` / `文档缺口:` 开头）：汇总成一条 note，提议登记新文档类型或给系统页加固定段；写进 note 后删掉这些条目。
 
 文档（只有项目文档根、教训目录、已有的开发者文档和 `AGENTS.md` 的生成段可写；碰了别的 land 整次丢弃）：
-- **方案**（PL-DUP、PL-STALE、PLN2）：同一件事写了两份 → 合成一份，删掉另一份并改好链接。过时方案 → 挪进 `<docs_root>/plans/archive/YYYY-MM-DD-<名>.md`，写 `Status: superseded` 和 `Superseded-by:`。
+- **方案**（PL-DUP、PL-STALE、PLN2）：同一件事写了两份 → 合成一份，删掉另一份并改好链接。过时方案 → 挪进 `<方案目录>/archive/YYYY-MM-DD-<名>.md`（方案目录缺省 `<docs_root>/plans`，或 `doc_types` 里 `role: plans` 的条目），写 `Status: superseded` 和 `Superseded-by:`。
 - **排期里已合的行**：每行挪进它所属方案末尾的变更记录；排期只留没做完的行。
 - **DOC4 放错位置 / 散落 .md**：看得出类型的挪进该类型的位置并改链接；重复的合并，过时的归档。哪类都不像的留在原处（文档目录把它列为未归类），写一条 note 提议新类型。
 - **DOC5 孤儿页**：从它该挂的页链过去，或合并掉。

@@ -359,6 +359,8 @@ def t_guard_cmd(tmp):
     nm = guard.NOMESS[0]
     ok = lambda c, tool="Bash": guard.is_nomess_command(c, tool)
     expect(ok('python "%s" check' % nm) and ok('"%s" dream land' % nm) and ok('python "%s" init --auto --lang zh-CN' % nm), "白名单内应放行")
+    expect(ok('python "%s" init --auto --docs free' % nm) and ok('python "%s" init --auto --docs=custom --lang en' % nm)
+           and not ok('python "%s" init --auto --docs x' % nm) and not ok('python "%s" init --auto --docs free --docs free' % nm), "init --docs 白名单")
     expect(ok('python "%s" dream mv a.md b.md' % nm) and ok('python "%s" dream rm a.md' % nm) and not ok('python "%s" dream rm a.md b.md' % nm), "dream mv / rm 白名单")
     expect(not ok('python "%s" off' % nm) and not ok('python "%s" check --freeze' % nm) and not ok('python "%s" check --fre' % nm)
            and not ok('python "%s" hooks uninstall' % nm) and not ok('python "%s" refresh' % nm), "白名单外不放行")

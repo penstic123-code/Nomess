@@ -46,10 +46,10 @@ def agents_entry(snap, cfg, spec):
     import doctypes
     import map as nm_map
     exp = nm_config.expanded(cfg)
-    ov, smap, sched = doctypes.overview(exp), nm_map.out_dir(exp) + "/index.md", exp["docs_root"] + "/schedule.md"
+    ov, smap, sched = doctypes.overview(exp), nm_map.out_dir(exp) + "/index.md", doctypes.role_path(exp, "schedule")
     out = [t("ENTRY_1", ov, smap) if snap.isfile(ov) else t("ENTRY_1B", smap), t("ENTRY_2"), t("ENTRY_3")]  # 总览页按需建,有才提
     out += doctypes.where_lines(exp)
-    if snap.isfile(sched):
+    if sched and snap.isfile(sched):
         out.append(t("ENTRY_4", sched))
     return "\n".join(out)
 

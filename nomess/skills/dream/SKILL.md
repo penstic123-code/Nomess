@@ -30,7 +30,7 @@ Lessons (files in the lessons directory of the worktree; an entry is `## Title` 
 - **doc gaps** (titles starting `Doc gap:` / `文档缺口:`): sum them up as one note proposing a registered doc type or a new fixed section of the system page; delete them once noted.
 
 Docs (only the project doc root, the lessons directory, existing developer docs and the generated part of `AGENTS.md` are writable; land discards anything else):
-- **plans** (PL-DUP, PL-STALE, PLN2): the same thing written twice → merge into one, delete the other and fix links. An outdated plan → move it to `<docs_root>/plans/archive/YYYY-MM-DD-<name>.md`, set `Status: superseded` and `Superseded-by:`.
+- **plans** (PL-DUP, PL-STALE, PLN2): the same thing written twice → merge into one, delete the other and fix links. An outdated plan → move it to `<plans dir>/archive/YYYY-MM-DD-<name>.md` (plans dir: default `<docs_root>/plans`, or the `doc_types` entry with `role: plans`), set `Status: superseded` and `Superseded-by:`.
 - **schedule rows already merged**: move each row into the change log at the end of the plan it belongs to; the schedule keeps only unfinished rows.
 - **DOC4 misplaced / stray .md**: move a page whose type is clear into that type's location and fix links; merge duplicates, archive outdated ones. One that fits no type stays where it is (the docs index lists it as unsorted) and gets a note proposing a new doc type.
 - **DOC5 orphans**: link them from the page they belong under, or merge them away.

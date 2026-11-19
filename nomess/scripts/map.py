@@ -181,11 +181,16 @@ def _hotspots(snap, cfg, es, linked):
 
 
 def _system_line(snap, cfg, name, derived):
-    page = snap.text("%s/systems/%s.md" % (nm_config.docs_root(cfg), name))
+    import doctypes
+    sysdir = doctypes.role_path(cfg, "systems")
+    if not sysdir:  # 13.15:没有 systems 那一类,只列名字
+        return "- **%s**" % name
+    rel = "%s/%s.md" % (sysdir, name)
+    page = snap.text(rel)
     if page is None:
-        return "- **%s**" % name if derived else t("MAP_SYS_NOPAGE", name, nm_config.docs_root(cfg), name)
+        return "- **%s**" % name if derived else t("MAP_SYS_NOPAGE", name, rel)
     m = re.search(r"^(?:%s)[:：]\s*(.+)$" % "|".join(alts("system_head", "what")), page, re.M)
-    return t("MAP_SYS_LINE", name, m.group(1).strip() if m else t("MAP_SYS_NOWHAT"), name)
+    return t("MAP_SYS_LINE", name, m.group(1).strip() if m else t("MAP_SYS_NOWHAT"), posixpath.relpath(rel, out_dir(cfg)))
 
 
 def _mermaid(systems, owner, es, only_linked):

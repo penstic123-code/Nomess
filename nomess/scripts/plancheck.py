@@ -46,12 +46,13 @@ def _cells(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 def sched_path(cfg):
-    return nm_config.docs_root(cfg) + "/schedule.md"
+    """总排期文件;没有 schedule 那一类(13.15)是 None。"""
+    return doctypes.role_path(cfg, "schedule")
 
 
 def schedule(snap, cfg):
     """总排期表 -> ([{pkg, deps, state, files: [glob], line}], [(行号, 原因)]);没有文件、没有表、没有“可改文件”列就是空。列数不对、状态值不认识的行跳过并记进第二项。"""
-    text = snap.text(sched_path(cfg))
+    text = snap.text(sched_path(cfg)) if sched_path(cfg) else None
     if text is None:
         return [], []
     lines = text.replace("\r\n", "\n").split("\n")
@@ -167,9 +168,9 @@ def mentioned(text):
 
 def stale(snap, cfg, systems):
     out = []
-    plans = nm_config.docs_root(cfg) + "/plans"
+    plans = doctypes.role_path(cfg, "plans")
     tys = doctypes.types(nm_config.expanded(cfg))
-    for rel in snap.ls(plans, ".md", True):
+    for rel in snap.ls(plans, ".md", True) if plans else []:
         if rel.startswith(plans + "/archive/") or doctypes.is_type_index(rel, doctypes.type_of(rel, tys), snap):  # 生成的索引页不查,免得叫 AI 去改它
             continue
         text = snap.text(rel)

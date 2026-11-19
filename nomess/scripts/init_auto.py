@@ -1,6 +1,7 @@
-"""nomess init --auto [--lang en|zh-CN] [--size small|medium|large] / nomess off。
+"""nomess init --auto [--lang en|zh-CN] [--size small|medium|large] [--docs standard|free|custom] / nomess off。
 init --auto:init skill 里机械的步骤全在这里(零 token):nomess.json、AGENTS.md 的 nomess 段、CLAUDE.md 导入、.gitignore / .gitattributes、
-<docs_root>/overview.md、refresh、check --freeze、hooks install;认出文档网站源目录时把它整体登记成对外文档(13.13)。已有文件只补缺的,重跑不改已有内容;不提交;会清掉 `git config nomess.auto false`。
+总览页(缺省 <docs_root>/overview.md)、refresh、check --freeze、hooks install;认出文档网站源目录时把它整体登记成对外文档(13.13)。
+--docs(13.15,只在新建 nomess.json 时用):standard 不写新键;free 写 doc_places free;custom 写 builtin_doc_types false 并把 5 个可编辑内置类型展开进 doc_types。已有文件只补缺的,重跑不改已有内容;不提交;会清掉 `git config nomess.auto false`。
 最后只打一行给 AI 转述(新增了什么、冻结了多少、提交检查接上没有)。
 退出码:0 完成,2 做不了(不在 git 仓库、分离头指针推不出主分支、--size 想调小)。
 off:hooks uninstall + git config --local nomess.auto false,并列出 init 建过的文件供手删(不自动删)。"""
@@ -36,7 +37,7 @@ M = {
                "nomess 已对这个仓库关闭(git 钩子已移除,nomess.auto=false)。init 建过的文件,要的话手删:%s"),
 }
 messages.add(M)
-OFF_FILES = ("nomess.json", ".nomess-baseline.json", "%s/overview.md", "%s/system-map/", ".claude/rules/nomess/",
+OFF_FILES = ("nomess.json", ".nomess-baseline.json", "{overview}", "%s/system-map/", ".claude/rules/nomess/",
              "AGENTS.md (the nomess section)", "CLAUDE.md (@AGENTS.md line)", ".gitignore / .gitattributes (nomess lines)")
 
 
@@ -83,16 +84,18 @@ def _add_lines(path, lines):
 
 
 def _fill_index(root, cfg_path, cfg, lang, put):
-    """补目录段(老项目、新项目同一条路):docgen 缺 docs-index / lessons-index 项就加,文件缺或缺标记就补;只补缺,已有内容不动。返回是否改了 nomess.json。"""
-    want = {"docs-index": nm_config.docs_root(cfg) + "/overview.md", "lessons-index": nm_config.lessons_dir(cfg) + "/README.md"}
+    """补目录段(老项目、新项目同一条路):docgen 缺 docs-index / lessons-index 项就加,文件缺或缺标记就补;只补缺,已有内容不动。返回是否改了 nomess.json。
+    builtin_doc_types:false 时 docs-index 跟着 overview 那一条走:人改了总览的位置,重跑 init 把登记改过去(13.15)。"""
+    want = {"docs-index": doctypes.role_path(cfg, "overview"), "lessons-index": nm_config.lessons_dir(cfg) + "/README.md"}
     gen = cfg.get("docgen", {})
-    missing = {n: f for n, f in want.items() if n not in gen}
+    missing = {n: f for n, f in want.items() if n not in gen
+               or n == "docs-index" and not cfg.get("builtin_doc_types", True) and gen[n].get("file") != f}
     if missing:
         raw = json.loads(_read(cfg_path).lstrip(chr(0xFEFF)))
         raw.setdefault("docgen", {}).update({n: {"file": f, "builtin": n} for n, f in missing.items()})
         nm_config.atomic_write(cfg_path, json.dumps(raw, indent=2, ensure_ascii=False) + NL)
     for name, rel in want.items():
-        rel = gen.get(name, {}).get("file", rel)
+        rel = rel if name in missing else gen[name].get("file", rel)
         text = _read(os.path.join(root, rel))
         mark = "<!-- GEN:%s BEGIN -->" % name
         if text is None:
@@ -108,6 +111,7 @@ def main(argv):
     ap.add_argument("--auto", action="store_true", required=True)
     ap.add_argument("--lang", choices=messages.LANGS, default="en")
     ap.add_argument("--size", choices=nm_config.SIZES)
+    ap.add_argument("--docs", choices=("standard", "free", "custom"), default="standard")
     a = ap.parse_args(argv)
     root = snapshot.toplevel(os.getcwd())  # 不在 git 仓库抛 SnapshotError,入口转成退出 2
     os.chdir(root)
@@ -140,8 +144,18 @@ def main(argv):
             new["public_docs"] = [site + "/**"]
             if site == "docs":
                 new["docs_root"] = "project-docs"
-                new["docgen"]["docs-index"]["file"] = "project-docs/overview.md"  # 模板按缺省根写的 docs/overview.md,换了根要跟着换
-                new["docgen"]["lessons-index"]["file"] = "project-docs/lessons/README.md"
+                new["docgen"]["lessons-index"]["file"] = "project-docs/lessons/README.md"  # 模板按缺省根写的,换了根要跟着换
+        if a.docs == "free":
+            new["doc_places"] = "free"
+        elif a.docs == "custom":  # 内置的 5 个可编辑类型原样展开,人直接在 nomess.json 里删、改名、改位置、加新类
+            at = {r: doctypes.role_path(new, r) for r in doctypes.ROLES}  # 先按内置算好位置(此时 new 还是 builtin_doc_types 缺省 true)
+            readme = os.path.dirname(at["overview"]) + "/README.md"  # 内置总览也认 README.md:只有它在时就用它,DOC4 才和 standard 一样
+            if not os.path.isfile(at["overview"]) and os.path.isfile(readme):
+                at["overview"] = readme
+            new["builtin_doc_types"] = False
+            new["doc_types"] = [{"name": t("DT_" + r), "what": t("DT_WHAT_" + r), ("file" if p.endswith(".md") else "dir"): p, "role": r}
+                                for r, p in at.items()]
+        new["docgen"]["docs-index"]["file"] = doctypes.role_path(new, "overview")  # 模板按缺省根写的 docs/overview.md,换了根要跟着换
         nm_config.atomic_write(cfg_path, json.dumps(new, indent=2, ensure_ascii=False) + "\n")
         touched.append(nm_config.CONFIG_NAME)
         cfg = nm_config.load(cfg_path)
@@ -187,12 +201,13 @@ def main(argv):
 
 def main_off(argv):
     root = snapshot.toplevel(os.getcwd())
-    docs = nm_config.DEFAULTS["docs_root"]
+    cfg = {}
     try:
-        docs = nm_config.docs_root(nm_config.load(nm_config.find_config(root)))  # 同时设好提示语言
+        cfg = nm_config.load(nm_config.find_config(root))  # 同时设好提示语言
     except FileNotFoundError:
         pass
+    docs, ov = nm_config.docs_root(cfg), doctypes.role_path(cfg, "overview")
     githook.uninstall(root)
     _git(root, "config", "--local", "nomess.auto", "false")
-    print(t("IA_OFF", ", ".join(f.replace("%s", docs) for f in OFF_FILES)))
+    print(t("IA_OFF", ", ".join(f.replace("%s", docs).replace("{overview}", ov) for f in OFF_FILES)))
     return 0

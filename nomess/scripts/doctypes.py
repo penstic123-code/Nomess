@@ -5,6 +5,8 @@
   docs-index 生成段(builtin.py 登记):放 overview.md 末尾,按类型分组列出全部文档,再列“未归类”(DOC4 存量)、开发者文档、对外文档。
 类型 = 设计稿第 5 节的 7 类(总览、系统说明页、教训库、总排期、方案、归属图;代理入口 AGENTS.md 不在文档根下所以不列)
 加全自动的 system-map,再加 nomess.json 的 doc_types 登记的类型。内置位置都相对 docs_root。
+builtin_doc_types:false 时(13.15)只认 doc_types 表(加永远在的教训库和系统图);条目的 role 说明它沿用哪项内置功能,role_path() 是唯一的取法。
+doc_places:"free" 时 DOC4 不报、guard 不挡,入口段改成“优先放进”。
 三档:项目文档(上面这些,全管)、开发者文档 dev_docs(只就地改)、对外文档 public_docs(只读);DOC4–7 只看项目文档。"""
 import difflib
 import posixpath
@@ -15,7 +17,7 @@ import lessons
 import messages
 import pathglob
 from messages import NAMES, alts, name as nm_name, t
-from nm_config import F, est_tokens
+from nm_config import F, docs_root, est_tokens
 
 INDEX_TOKENS = 1500  # docs-index 超过它先把归档方案收成“N 份 + 最新 5 份”,还超就把有多页的类型各收成一行(详单进该类型目录的 README.md,13.14)
 ARCHIVE_KEEP = 5
@@ -52,6 +54,7 @@ M = {
     "DT_WHAT_system-map": ("generated code map; do not edit by hand", "生成的代码地图,不要手改"),
     "DT_UNSORTED": ("Unsorted", "未归类"),
     "DT_UNSORTED_WHAT": ("not in any type location: move them, or register a type under `doc_types`", "不在任何类型的位置:挪过去,或在 `doc_types` 登记新类型"),
+    "DT_UNSORTED_FREE": ("not in any type location", "不在任何类型的位置"),
     "DT_TYPE_LINE": ("%s — %d pages, see [%s](%s)", "%s — %d 份,见 [%s](%s)"),
     "DT_LESSONS_LINE": ("[lessons index](%s) — %d entries", "[教训索引](%s) — %d 条"),
     "DT_LESSONS_COUNT": ("%d lesson entries", "%d 条教训"),
@@ -69,6 +72,7 @@ M = {
     "DT_TIER_DIR": ("`%s`: %d pages", "`%s`:%d 页"),
     "DT_WHERE": ("- Docs go only here: %s; a new .md elsewhere under %s/ is blocked.",
                  "- 文档只放这些位置:%s;%s/ 下别处新建 .md 会被挡。"),
+    "DT_WHERE_FREE": ("- Docs go preferably here: %s.", "- 文档优先放进这些位置:%s。"),
     "DT_WHERE_LESSONS": ("lessons via `nomess lessons add`", "教训用 `nomess lessons add`"),
     "DT_NOW": ("- Write docs as things are now: change old wording in place, never append \"update: ...\"; history lives in git.",
                "- 文档只写现在的样子:旧说法直接改掉,不追加“更新:…”;历史靠 git。"),
@@ -87,6 +91,8 @@ _BUILTIN = [("overview", ["overview.md", "README.md"], [], False),  # 文档目�
             ("plans", [], ["plans", "plans/archive"], False),
             ("ownership", ["ownership-map.md"], [], False),
             ("system-map", [], ["system-map"], True)]
+ROLES = ("overview", "systems", "schedule", "plans", "ownership")  # doc_types 条目能沿用的内置功能(13.15);教训库和系统图永远在、不进表
+_ALWAYS = ("lessons", "system-map")
 # 开发者文档、对外文档的内置 glob(开头 / = 只认仓库根)。nomess.json 的 dev_docs / public_docs 是在它们之上追加、不是替换:
 # 写了自己的列表也不会让 README 之类变得可改。两档都匹配时算对外(更严的那档)。
 DEV_DOCS = ["/CONTRIBUTING*", "/HACKING*", "/DEVELOPMENT*"]
@@ -97,26 +103,47 @@ BUDGETS = {"overview": 3000, "systems": 3000, "lessons": 3000, "schedule": 4000,
 
 
 def types(exp):
-    """展开后的配置 -> [{id, name, what, files, dirs, deep}]:内置在前,doc_types 登记的在后(按配置顺序)。"""
-    root = exp["docs_root"]
-    out = []
+    """展开后的配置 -> [{id, name, what, files, dirs, deep}]:内置在前,doc_types 登记的在后(按配置顺序)。
+    builtin_doc_types:false 时登记的在前、只跟教训库和系统图;带 role 的条目 id 就是 role,目录段、DOC6 等按内置那类对待(plans 也认 <dir>/archive)。"""
+    root, full = exp["docs_root"], exp["builtin_doc_types"]
+    built = []
     for tid, files, dirs, deep in _BUILTIN:
-        out.append({"id": tid, "name": t("DT_" + tid), "what": t("DT_WHAT_" + tid), "files": [root + "/" + f for f in files],
-                    "budget": exp["doc_budget"].get(tid, BUDGETS.get(tid)),
-                    "dirs": [exp["lessons_dir"] if d is None else root + "/" + d for d in dirs], "deep": deep})
+        if full or tid in _ALWAYS:
+            built.append({"id": tid, "name": t("DT_" + tid), "what": t("DT_WHAT_" + tid), "files": [root + "/" + f for f in files],
+                          "budget": exp["doc_budget"].get(tid, BUDGETS.get(tid)) if full else BUDGETS.get(tid),  # false 时 doc_budget 只认条目名
+                          "dirs": [exp["lessons_dir"] if d is None else root + "/" + d for d in dirs], "deep": deep})
+    mine = []
     for x in exp["doc_types"]:
-        out.append({"id": "doc_types:" + x["name"], "name": x["name"], "what": x["what"], "files": [], "dirs": [x["dir"]], "deep": False,
-                    "budget": exp["doc_budget"].get(x["name"])})
-    return out
+        role, d = x.get("role"), x.get("dir")
+        mine.append({"id": role or "doc_types:" + x["name"], "name": x["name"], "what": x["what"], "files": [x["file"]] if "file" in x else [],
+                     "dirs": [d, d + "/archive"] if role == "plans" else [d] if d else [], "deep": False,
+                     "budget": exp["doc_budget"].get(x["name"], BUDGETS.get(role))})
+    return built + mine if full else mine + built
 
 
-def builtin_dirs(root, lessons_dir):
-    """内置类型占用的目录(doc_types 的 dir 不许和它们重叠,nm_config 校验用)。"""
-    return {root + "/" + d for _, _, dirs, _ in _BUILTIN for d in dirs if d} | {posixpath.normpath(lessons_dir)}
+def builtin_dirs(root, lessons_dir, full=True):
+    """内置类型占用的目录(doc_types 的 dir / file 不许和它们重叠,nm_config 校验用);full 为假(builtin_doc_types:false)只剩教训库和系统图。"""
+    return {root + "/" + d for tid, _, dirs, _ in _BUILTIN for d in dirs if d and (full or tid in _ALWAYS)} | {posixpath.normpath(lessons_dir)}
+
+
+def builtin_files(root, full=True):
+    """内置类型占用的单个文件:只拿来挡新写法的 file 条目(老的 dir 条目照 1.1.1 只和目录比)。"""
+    return {root + "/" + f for _, files, _, _ in _BUILTIN for f in files} if full else set()
+
+
+def role_path(cfg, role):
+    """role(ROLES 之一)那项内置功能读的文件或目录(仓库相对),没有返回 None(那项功能静默不跑)。原始配置和 expanded() 后的都能传。
+    builtin_doc_types 为真(缺省)时就是内置位置 <docs_root>/overview.md、/systems、/schedule.md、/plans、/ownership-map.md,
+    和 1.1.1 写死的一字不差;为假时取 doc_types 里带这个 role 的条目。"""
+    if cfg.get("builtin_doc_types", True):
+        files, dirs = next((f, d) for tid, f, d, _ in _BUILTIN if tid == role)
+        return docs_root(cfg) + "/" + (files or dirs)[0]
+    x = next((x for x in cfg.get("doc_types", []) if x.get("role") == role), None)
+    return x and (x.get("file") or x.get("dir"))
 
 
 def overview(exp):
-    return exp["docs_root"] + "/overview.md"
+    return role_path(exp, "overview")
 
 
 def site_dir(snap):
@@ -197,13 +224,15 @@ def _suggest(rel, tys):
 def blocked(rel, exp, snap):
     """guard 当场挡用(13.12 第 1 条):新建的 rel 是 docs_root 下、不属于开发者 / 对外文档、不在任何类型位置的 .md -> 提示语,否则 None。
     和 DOC4 新增报红是同一条规则,提前到动笔时省一轮返工。snap 只用来认网站源目录(site_dir),放在 docs_root 判断之后才读。"""
-    if not (rel.startswith(exp["docs_root"] + "/") and rel.endswith(".md")) or tier_of(exp, site_dir(snap))(rel):
+    if exp["doc_places"] == "free" or not (rel.startswith(exp["docs_root"] + "/") and rel.endswith(".md")) or tier_of(exp, site_dir(snap))(rel):
         return None
     tys = types(exp)
     return None if type_of(rel, tys) else t("DT_MISPLACED", rel, _suggest(rel, tys))
 
 
 def doc4(snap, changes, exp):
+    if exp["doc_places"] == "free":  # 13.15:不管位置,散放的页只进目录段的“未归类”
+        return []
     tys = types(exp)
     return [F("red" if changes.get(p) == "A" else "yellow", "DOC4", p, 1, "misplaced", t("DT_MISPLACED", p, _suggest(p, tys)))
             for p in misplaced(snap, exp)]
@@ -231,13 +260,18 @@ def reachable(snap, exp):
     return seen
 
 
+def _archive(exp):
+    """归档方案的目录前缀(带结尾 /);没有 plans 那一类时是个不会匹配任何路径的串。"""
+    return (role_path(exp, "plans") or "\0") + "/archive/"
+
+
 def doc5(snap, exp):
     ov, root = overview(exp), exp["docs_root"]
     if not snap.isfile(ov):
         return []
     seen = reachable(snap, exp)
     tys = types(exp)
-    orphans = [p for p in pages(snap, exp) if p not in seen and not p.startswith((root + "/plans/archive/", root + "/system-map/"))
+    orphans = [p for p in pages(snap, exp) if p not in seen and not p.startswith((_archive(exp), root + "/system-map/"))
                and not is_type_index(p, type_of(p, tys), snap)]
     if not orphans:
         return []
@@ -253,7 +287,7 @@ def doc6(snap, exp):
     out = []
     for p in pages(snap, exp):
         ty = type_of(p, tys)
-        if ty is None or ty["budget"] is None or p.startswith(exp["docs_root"] + "/plans/archive/") or is_type_index(p, ty, snap):
+        if ty is None or ty["budget"] is None or p.startswith(_archive(exp)) or is_type_index(p, ty, snap):
             continue
         n = est_tokens(snap.text(p) or "")
         if n > ty["budget"]:
@@ -262,10 +296,13 @@ def doc6(snap, exp):
 
 
 def doc7(snap, changes, exp):
-    """DOC7(黄):本次改了某子系统的源文件,而 <docs_root>/systems/<名>.md 存在且不在改动里 -> 每个子系统一条。
+    """DOC7(黄):本次改了某子系统的源文件,而 <systems 目录>/<名>.md 存在且不在改动里 -> 每个子系统一条;没有 systems 那一类不跑。
     只按真实改动判:全量检查(nomess check、配置变了的提交)的 changes 是整棵树都算 A,说明页自己也在里面,所以自然不报。"""
     import arch
     import deps
+    sysdir = role_path(exp, "systems")
+    if not sysdir:
+        return []
     owner = arch.ownership(snap, exp)
     n = {}
     for p in deps.sources([p for p, st in changes.items() if st != "D"]):
@@ -273,7 +310,7 @@ def doc7(snap, changes, exp):
             n[owner[p]] = n.get(owner[p], 0) + 1
     out = []
     for name, k in sorted(n.items()):
-        page = "%s/systems/%s.md" % (exp["docs_root"], name)
+        page = "%s/%s.md" % (sysdir, name)
         if snap.isfile(page) and page not in changes:
             out.append(F("yellow", "DOC7", page, 0, "stale", t("DT_STALE_PAGE", name, k, page), k=["stale"]))
     return out
@@ -291,7 +328,7 @@ def stale_refs(snap, exp):
     没归档的已有 PL-STALE)、教训库(条目讲的是当时的坑)。"""
     import plancheck
     tier = tier_of(exp, site_dir(snap))
-    skip = tuple(exp["docs_root"] + d for d in ("/system-map/", "/plans/")) + (exp["lessons_dir"] + "/",)
+    skip = (exp["docs_root"] + "/system-map/", (role_path(exp, "plans") or "\0") + "/", exp["lessons_dir"] + "/")
     out = []
     for rel in sorted(set(pages(snap, exp) + tier_pages(snap, exp, "dev") + tier_pages(snap, exp, "public"))):
         if rel.startswith(skip):
@@ -316,6 +353,8 @@ def where_lines(exp):
             parts.append("%s `%s/<name>.md`" % (ty["name"], ty["dirs"][0]))
         else:
             parts.append("%s `%s`" % (ty["name"], (ty["files"] or [ty["dirs"][0] + "/"])[0]))
+    if exp["doc_places"] == "free":  # 13.15:不挡,就不说“会被挡”
+        return [t("DT_WHERE_FREE", " | ".join(parts)), t("DT_NOW")]
     return [t("DT_WHERE", " | ".join(parts), exp["docs_root"]), t("DT_NOW")]
 
 
@@ -419,7 +458,7 @@ def _render(snap, exp, base, level):
             out += ["### %s — %s" % (ty["name"], ty["what"]), ""] + lines + [""]
     stray = misplaced(snap, exp)
     if stray:
-        out += ["### %s — %s" % (t("DT_UNSORTED"), t("DT_UNSORTED_WHAT")), ""] + [_line(snap, p, base) for p in stray] + [""]
+        out += ["### %s — %s" % (t("DT_UNSORTED"), t("DT_UNSORTED_FREE" if exp["doc_places"] == "free" else "DT_UNSORTED_WHAT")), ""] + [_line(snap, p, base) for p in stray] + [""]
     for which in ("dev", "public"):  # 13.13:这两档内容不归 nomess 管,只列出来让人能从首页找到
         lines = _tier_lines(snap, exp, which, base)
         if lines:
