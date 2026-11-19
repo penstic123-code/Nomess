@@ -90,6 +90,25 @@ def produce(snap, cfg, spec):
     return r.stdout
 
 
+def _type_indexes(snap, cfg, stale, puts):
+    """类型索引页(13.14):随 docs-index 一起算,不用在 nomess.json 登记。已有且带 type-index 标记的照常比对;不存在的新建(type_indexes 只在目录溢出时才列出);
+    存在但没标记的不碰。"""
+    import doctypes
+    b, e = markers("type-index")
+    for rel, (name, body) in doctypes.type_indexes(snap, cfg).items():
+        text = puts.get(rel)
+        if text is None:
+            text = snap.text(rel)
+        if text is None:
+            text = "# %s\n\n%s\n%s\n" % (name, b, e)
+        elif not re.search("^" + re.escape(b), text, re.M):
+            continue
+        elif same(read_section(text, "type-index", rel), body):
+            continue
+        stale.append(("type-index", rel))
+        puts[rel] = replace_section(text, "type-index", body, rel)
+
+
 def run(snap, cfg, names=None, exec_=True):
     """按快照算生成段:返回 (过时的 [(名字, 文件)], {文件: 换好段的完整新内容 bytes})。不写盘。
     exec_ 为假时跳过 cmd 生成器(它们会执行项目代码)。"""
@@ -116,6 +135,8 @@ def run(snap, cfg, names=None, exec_=True):
         if not same(read_section(text, name, rel), body):
             stale.append((name, rel))
             puts[rel] = replace_section(text, name, body, rel)
+    if any(sections[n].get("builtin") == "docs-index" for n in names or sections):
+        _type_indexes(snap, cfg, stale, puts)
     return stale, {rel: text.encode("utf-8") for rel, text in puts.items()}
 
 

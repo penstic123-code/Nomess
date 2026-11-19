@@ -17,7 +17,7 @@ import pathglob
 from messages import NAMES, alts, name as nm_name, t
 from nm_config import F, est_tokens
 
-INDEX_TOKENS = 1500  # docs-index 超过它就把归档方案收成“N 份 + 最新 5 份”
+INDEX_TOKENS = 1500  # docs-index 超过它先把归档方案收成“N 份 + 最新 5 份”,还超就把有多页的类型各收成一行(详单进该类型目录的 README.md,13.14)
 ARCHIVE_KEEP = 5
 SENTENCE = 100  # 每页“开头第一句”最多这么多字符
 
@@ -52,6 +52,7 @@ M = {
     "DT_WHAT_system-map": ("generated code map; do not edit by hand", "生成的代码地图,不要手改"),
     "DT_UNSORTED": ("Unsorted", "未归类"),
     "DT_UNSORTED_WHAT": ("not in any type location: move them, or register a type under `doc_types`", "不在任何类型的位置:挪过去,或在 `doc_types` 登记新类型"),
+    "DT_TYPE_LINE": ("%s — %d pages, see [%s](%s)", "%s — %d 份,见 [%s](%s)"),
     "DT_LESSONS_LINE": ("[lessons index](%s) — %d entries", "[教训索引](%s) — %d 条"),
     "DT_LESSONS_COUNT": ("%d lesson entries", "%d 条教训"),
     "DT_STATUS": ("(status: %s)", "(状态:%s)"),
@@ -158,6 +159,16 @@ def type_of(rel, tys):
     return next((ty for ty in tys if _belongs(rel, ty)), None)
 
 
+def is_type_index(rel, ty, snap):
+    """rel 是不是类型 ty 的索引页(<首个目录>/README.md 且含 type-index 生成段标记):不算该类型的页,DOC5、DOC6 和目录都不把它当页。
+    只认路径会把项目原有的手写 README 吞掉(从目录消失、DOC5/6 不查),所以还要看标记。
+    pages() 仍含它:DOC5 的可达判断要顺着它的链接走(收起后类型下的页只在它里面列着)。"""
+    if not (ty and ty["dirs"] and rel == ty["dirs"][0] + "/README.md"):
+        return False
+    import docgen
+    return re.search("^" + re.escape(docgen.markers("type-index")[0]), snap.text(rel) or "", re.M) is not None
+
+
 def pages(snap, exp):
     """项目文档:docs_root 下的 .md,去掉属于开发者文档、对外文档的。"""
     tier = tier_of(exp, site_dir(snap))
@@ -225,7 +236,9 @@ def doc5(snap, exp):
     if not snap.isfile(ov):
         return []
     seen = reachable(snap, exp)
-    orphans = [p for p in pages(snap, exp) if p not in seen and not p.startswith((root + "/plans/archive/", root + "/system-map/"))]
+    tys = types(exp)
+    orphans = [p for p in pages(snap, exp) if p not in seen and not p.startswith((root + "/plans/archive/", root + "/system-map/"))
+               and not is_type_index(p, type_of(p, tys), snap)]
     if not orphans:
         return []
     msg = t("DT_ORPHANS", len(orphans), ov, min(3, len(orphans)), ", ".join(orphans[:3]))
@@ -235,12 +248,12 @@ def doc5(snap, exp):
 
 
 def doc6(snap, exp):
-    """DOC6(黄):按类型的软预算。归档方案和教训库的生成索引页(README.md)不查。"""
+    """DOC6(黄):按类型的软预算。归档方案和各类型的索引页(README.md)不查。"""
     tys = types(exp)
     out = []
     for p in pages(snap, exp):
         ty = type_of(p, tys)
-        if ty is None or ty["budget"] is None or p.startswith(exp["docs_root"] + "/plans/archive/") or (ty["id"] == "lessons" and p.endswith("/README.md")):
+        if ty is None or ty["budget"] is None or p.startswith(exp["docs_root"] + "/plans/archive/") or is_type_index(p, ty, snap):
             continue
         n = est_tokens(snap.text(p) or "")
         if n > ty["budget"]:
@@ -357,10 +370,24 @@ def _lessons_lines(snap, ty, base):
     return [t("DT_LESSONS_LINE", posixpath.relpath(readme, base), n) if snap.isfile(readme) else t("DT_LESSONS_COUNT", n)]
 
 
+def _mine(snap, exp, ty, tys):
+    return [p for p in pages(snap, exp) if type_of(p, tys) is ty and p != overview(exp) and not is_type_index(p, ty, snap)]
+
+
+def _foldable(snap, exp, ty, tys):
+    """能收成一行的类型:有目录、不是教训库(自己有 README)和系统图(本来就一行),且至少 2 页(不算它自己的索引页)。"""
+    if not ty["dirs"] or ty["id"] in ("lessons", "system-map"):
+        return False
+    readme = ty["dirs"][0] + "/README.md"
+    if snap.isfile(readme) and not is_type_index(readme, ty, snap):  # 手写的 README 没有生成段:清单没地方放,这一类型不收
+        return False
+    return len(_mine(snap, exp, ty, tys)) >= 2
+
+
 def _group(snap, exp, ty, tys, base, collapse):
     if ty["id"] == "system-map":  # 系统图首页每次 refresh 都生成:固定链接,不看它此刻在不在(同一次 refresh 里它可能还没写出,看了就会自己把目录段判成过时)
         return ["- [%s](%s)" % (ty["name"], posixpath.relpath(ty["dirs"][0] + "/index.md", base))]
-    mine = [p for p in pages(snap, exp) if type_of(p, tys) is ty and p != overview(exp)]
+    mine = _mine(snap, exp, ty, tys)
     if not mine:
         return []
     if ty["id"] == "lessons":
@@ -377,11 +404,17 @@ def _group(snap, exp, ty, tys, base, collapse):
     return out + [_plan_line(snap, p, base) for p in old]
 
 
-def _render(snap, exp, base, collapse):
+def _render(snap, exp, base, level):
+    """level 0 完整;1 归档方案收起;2 再把有多页的类型各收成一行。"""
     tys = types(exp)
     out = []
     for ty in tys:
-        lines = _group(snap, exp, ty, tys, base, collapse)
+        if level == 2 and _foldable(snap, exp, ty, tys):
+            readme = ty["dirs"][0] + "/README.md"
+            rel = posixpath.relpath(readme, base)
+            lines = ["- " + t("DT_TYPE_LINE", ty["name"], len(_mine(snap, exp, ty, tys)), rel, rel)]
+        else:
+            lines = _group(snap, exp, ty, tys, base, level >= 1)
         if lines:
             out += ["### %s — %s" % (ty["name"], ty["what"]), ""] + lines + [""]
     stray = misplaced(snap, exp)
@@ -414,10 +447,39 @@ def _tier_lines(snap, exp, which, base):
     return out
 
 
+def _spec(cfg):
+    return next((x for x in cfg.get("docgen", {}).values() if x.get("builtin") == "docs-index"), None)
+
+
+def _levelled(snap, exp, base):
+    """(docs-index 正文, 收到第几级):依次试完整、收起归档、按类型收,第一个不超 INDEX_TOKENS 的;都超就是第 2 级。"""
+    for level in (0, 1):
+        text = _render(snap, exp, base, level)
+        if est_tokens(text) <= INDEX_TOKENS:
+            return text, level
+    return _render(snap, exp, base, 2), 2
+
+
 def docs_index(snap, cfg, spec):
-    """内置生成器 docs-index:全部 docs 页的目录。超过 INDEX_TOKENS 把归档方案收成“N 份 + 最新 5 份”。同一棵树两次生成逐字节相同(只读快照、排序固定)。"""
+    """内置生成器 docs-index:全部 docs 页的目录。超过 INDEX_TOKENS 逐级收(见 _levelled)。同一棵树两次生成逐字节相同(只读快照、排序固定)。"""
+    import nm_config
+    return _levelled(snap, nm_config.expanded(cfg), posixpath.dirname(spec["file"]))[0]
+
+
+def type_indexes(snap, cfg):
+    """类型索引页的生成段(13.14):{相对路径: (类型名, 生成段正文)},正文就是该类型在完整目录里的那些行(归档方案收成“N 份 + 最新 5 份”)。
+    已有的索引页(不论目录收没收起)都在内、照常刷新;不存在的只在 docs-index 收到按类型这一级、且该类型有多页时才算(由 docgen 新建)。"""
     import nm_config
     exp = nm_config.expanded(cfg)
+    spec = _spec(cfg)
     base = posixpath.dirname(spec["file"])
-    full = _render(snap, exp, base, False)
-    return full if est_tokens(full) <= INDEX_TOKENS else _render(snap, exp, base, True)
+    folded = _levelled(snap, exp, base)[1] == 2
+    tys = types(exp)
+    out = {}
+    for ty in tys:
+        if not ty["dirs"] or ty["id"] in ("lessons", "system-map"):
+            continue
+        readme = ty["dirs"][0] + "/README.md"
+        if snap.isfile(readme) or folded and _foldable(snap, exp, ty, tys):
+            out[readme] = (ty["name"], "\n".join(_group(snap, exp, ty, tys, ty["dirs"][0], True)))
+    return out

@@ -9,6 +9,7 @@ import re
 
 import deps
 import doccheck
+import doctypes
 import lessons
 import map as nm_map
 import messages
@@ -167,8 +168,9 @@ def mentioned(text):
 def stale(snap, cfg, systems):
     out = []
     plans = nm_config.docs_root(cfg) + "/plans"
+    tys = doctypes.types(nm_config.expanded(cfg))
     for rel in snap.ls(plans, ".md", True):
-        if rel.startswith(plans + "/archive/"):
+        if rel.startswith(plans + "/archive/") or doctypes.is_type_index(rel, doctypes.type_of(rel, tys), snap):  # 生成的索引页不查,免得叫 AI 去改它
             continue
         text = snap.text(rel)
         seen = set()
