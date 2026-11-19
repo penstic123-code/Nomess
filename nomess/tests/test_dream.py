@@ -183,6 +183,63 @@ def t_land_and_revert(tmp):
     expect(git(root, "diff", orig, "HEAD", "--stat") == "", "一个 git revert 应完全撤回")
 
 
+def _net_repo(tmp, name, files):
+    root, mem = setup(tmp, name)
+    for rel, text in files:
+        put(root, rel, text)
+    commit_all(root)
+    run(root, "begin")
+    return root, mem
+
+
+def _lines(tag, n):
+    return "".join("%s %d\n" % (tag, i) for i in range(n))
+
+
+def t_net_delete(tmp):
+    # 合并:删一个文件、另一个加差不多的行,净删接近 0,不拦
+    root, _ = _net_repo(tmp, "netmerge", [("docs/systems/a.md", "# a\n" + _lines("甲", 100)), ("docs/systems/b.md", "# b\n" + _lines("乙", 100))])
+    put(wt(root), "docs/systems/a.md", "# a\n" + _lines("甲", 100) + _lines("乙", 100))
+    os.remove(os.path.join(wt(root), "docs/systems/b.md"))
+    rc, out = run(root, "land")
+    expect("已丢弃" not in out and "git show --stat" in out and "b.md" in out, "合并不该被拦,总结应列出被删的页: %r" % out)
+    # 净删 61 行:丢弃、notes 记一条、状态记 no_net_delete,下次 begin 第一行提示
+    root, _ = _net_repo(tmp, "netover", [("docs/systems/a.md", "# a\n" + _lines("甲", 60))])
+    head = git(root, "rev-parse", "HEAD")
+    os.remove(os.path.join(wt(root), "docs/systems/a.md"))  # 删 61 行
+    rc, out = run(root, "land")
+    expect_discarded(root, out, head, "净删 61 行")
+    notes = read(root, ".nomess/dream-notes.md")
+    expect("整理想净删 61 行" in notes and "apply 1" in notes, "notes 应记一条: %r" % notes)
+    expect(json.load(open(state_path(root), encoding="utf-8"))["no_net_delete"] is True, "状态应记 no_net_delete")
+    rc, out = run(root, "begin")
+    expect(out.splitlines()[0].startswith("本次不许净删"), "下次 begin 第一行应提示: %r" % out)
+
+
+def t_net_delete_mem_when_project_rejected(tmp):
+    """项目侧因别的原因(改对外文档)被丢弃,记忆侧净删 100 行也要拦:记忆被撤回、notes 记一条。"""
+    root, mem = setup(tmp, "netmem")
+    put(mem, "big.md", "# big\n" + _lines("记", 100))
+    commit_all(root)
+    run(root, "begin")  # begin 给记忆目录存底(含 big.md)
+    put(wt(root), "README.md", "# 对外\n")
+    os.remove(os.path.join(mem, "big.md"))
+    rc, out = run(root, "land")
+    expect("已丢弃" in out and "记忆改动已撤回" in out, "应丢弃并撤回记忆: %r" % out)
+    expect(os.path.isfile(os.path.join(mem, "big.md")), "记忆里被删的页应被 revert 回来")
+    expect("整理想净删" in read(root, ".nomess/dream-notes.md"), "notes 应记一条")
+
+
+def t_net_delete_archive(tmp):
+    """改名进 archive/ 同时删很多行:不计入净删。"""
+    root, _ = _net_repo(tmp, "netarch", [("docs/plans/p.md", "状态: 提案\n\n# 方案\n" + _lines("保留", 150) + _lines("删掉", 150))])
+    os.makedirs(os.path.join(wt(root), "docs/plans/archive"))
+    subprocess.run(["git", "mv", "docs/plans/p.md", "docs/plans/archive/p.md"], cwd=wt(root), check=True)
+    put(wt(root), "docs/plans/archive/p.md", "状态: 已采纳\n\n# 方案\n" + _lines("保留", 150))
+    rc, out = run(root, "land")
+    expect("已丢弃" not in out and os.path.isfile(os.path.join(root, "docs/plans/archive/p.md")), "归档里删行不该拦: %r" % out)
+
+
 def t_tiers(tmp):
     """13.13:改对外文档 -> 整次丢弃;新增开发者文档 -> 丢弃;修改已有开发者文档 -> 落地。"""
     root, _ = setup(tmp, "tiers")

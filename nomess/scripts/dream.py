@@ -31,6 +31,8 @@ from messages import t
 
 LOCK, STATE = "nomess-dream.lock", "nomess-dream.json"
 LOCK_TTL = 2 * 3600  # 超过 2 小时算上次死掉的
+NET_DELETE_MAX = 60  # 一次整理净删(删行 − 增行)超过它就整次丢弃。推定值,按实际调(设计稿 13.14)
+LIST_MAX = 3  # 总结里被删页、缩得最多的页各列几个
 NOTES = os.path.join(".nomess", "dream-notes.md")
 NOMESS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nomess.py")
 CONVENTION = {"README", "CHANGELOG", "LICENSE", "CONTRIBUTING", "CODE_OF_CONDUCT", "SECURITY", "AGENTS", "CLAUDE"}  # 惯例文件(任何层的同名 .md)不接管
@@ -83,6 +85,17 @@ M = {
     "DR_SUM_NOTES": ("; %d items wait for you, see .nomess/dream-notes.md", ";有 %d 条等你定,见 .nomess/dream-notes.md"),
     "DR_MSG": ("nomess dream: moved %d, merged or removed %d, archived %d, rewritten %d", "nomess dream: 挪 %d、合并或删 %d、归档 %d、改写 %d"),
     "DR_PRE": ("pre-dream snapshot", "pre-dream snapshot"),
+    "DR_SEP": ("; ", ";"),
+    "DR_GONE": ("deleted: %s", "删了:%s"),
+    "DR_SHRUNK": ("shrunk most: %s", "缩得最多:%s"),
+    "DR_ETC": (" and %d more", "等 %d 个"),
+    "DR_SHOW": ("see what changed: `git show --stat %s`", "看改了什么:`git show --stat %s`"),
+    "DR_NET": ("wanted to delete a net %d lines, over %d: %s", "想净删 %d 行,超过 %d:%s"),
+    "DR_NET_NOTE": ("%d. dream wanted to delete a net %d lines: %s; to do it run `/nomess:dream apply %d`",
+                    "%d. 整理想净删 %d 行:%s;要执行敲 `/nomess:dream apply %d`"),
+    "DR_NET_MEM": ("; the memory changes were reverted", ";记忆改动已撤回"),
+    "DR_NO_NET": ("this run may not delete a net amount: only merge, move, archive and rewrite; whatever you delete, add back",
+                  "本次不许净删:只合并、挪、归档、改写,删多少补多少"),
     "DR_MEM_MSG": ("dream: memory tidy", "dream: 整理记忆"),
 }
 messages.add(M)
@@ -140,7 +153,7 @@ def _root():
 # ---------------------------------------------------------------- 状态
 
 def _state(root):
-    s = {"last_attempt": "", "fingerprint": "", "backlog": False, "landed_once": False, "summary": None, "next_check": ""}
+    s = {"last_attempt": "", "fingerprint": "", "backlog": False, "landed_once": False, "summary": None, "next_check": "", "no_net_delete": False}
     p = os.path.join(_common(root), STATE)
     if os.path.isfile(p):
         with open(p, encoding="utf-8") as f:
@@ -410,6 +423,8 @@ def begin(root):
         _remove_wt(root)
         _release(root)
         raise
+    if _state(root)["no_net_delete"]:
+        print(t("DR_NO_NET"))
     print(t("DR_LIST", len(shown)))
     for k in dict.fromkeys(k for k, _ in shown):
         print("[%s]" % t("DR_K_" + k))
@@ -463,9 +478,16 @@ def _nomess(wt, *args):
     return subprocess.run([sys.executable, NOMESS, *args], cwd=wt, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # git 的空树:记忆仓库 unborn HEAD(begin 时目录为空没有存底提交)时当基准
+
+
+def _base(cwd):
+    return "HEAD" if _run(cwd, "rev-parse", "-q", "--verify", "HEAD")[0] == 0 else EMPTY_TREE
+
+
 def _changes(wt):
     """worktree 全部暂存后相对 HEAD 的改动 [(状态字母, 路径...)](R 带旧、新两个路径;相似度 30% 以上算改名,整理常顺手改链接)。"""
-    tok = [x for x in _must(wt, "diff", "--cached", "-z", "--name-status", "-M30%", "HEAD").split("\0") if x]
+    tok = [x for x in _must(wt, "diff", "--cached", "-z", "--name-status", "-M30%", _base(wt)).split("\0") if x]
     out, i = [], 0
     while i < len(tok):
         n = 3 if tok[i][0] in "RC" else 2
@@ -552,6 +574,36 @@ def _vet(snap, wt, exp, changes):
     return None
 
 
+def _loss(cwd, gen):
+    """cwd 里暂存后相对 HEAD 的损失,从 numstat 算:{net 净删行数, deleted 被删的页, shrunk [(页, 净减行数)] 从多到少}。
+    net 不计:新路径含 /archive/ 的(归档只是挪)、gen 前缀下的生成物、二进制;deleted 只去掉生成物(归档里删的页也该说)。
+    改名只看内容变化(-M30%,和 _changes 同一个阈值),所以合并(一份删、一份加)净删小。"""
+    deleted = [ps[0] for st, *ps in _changes(cwd) if st == "D" and not ps[0].startswith(gen)]
+    tok = _must(cwd, "diff", "--cached", "--numstat", "-z", "-M30%", _base(cwd)).split("\0")
+    net, shrunk, i = 0, [], 0
+    while i < len(tok) and tok[i]:
+        a, d, path = tok[i].split("\t", 2)
+        i += 1
+        if not path:  # 改名:后面跟旧、新两个路径
+            path, i = tok[i + 1], i + 2
+        if a == "-" or "/archive/" in path or path.startswith(gen):
+            continue
+        n = int(d) - int(a)
+        net += n
+        if n > 0 and path not in deleted:
+            shrunk.append((path, n))
+    return {"net": net, "deleted": deleted, "shrunk": sorted(shrunk, key=lambda x: -x[1])}
+
+
+def _gone(*losses):
+    """被删的页和缩得最多的页(各最多 LIST_MAX 个,超出写“等 N 个”)-> [文字片段];记忆侧的名字前加 memory/。"""
+    def cut(names):
+        return ", ".join(names[:LIST_MAX]) + (t("DR_ETC", len(names) - LIST_MAX) if len(names) > LIST_MAX else "")
+    dels = [n for L in losses for n in L["deleted"]]
+    shr = sorted((x for L in losses for x in L["shrunk"]), key=lambda x: -x[1])
+    return ([t("DR_GONE", cut(dels))] if dels else []) + ([t("DR_SHRUNK", cut(["%s -%d" % x for x in shr]))] if shr else [])
+
+
 def _counts(changes, exp):
     """(挪, 合并或删, 归档, 改写):从 diff 推,不让 AI 自报;自动生成的文件(系统图、规则文件、AGENTS.md)不算改写。"""
     gen = nm_map.out_dir(exp) + "/"
@@ -618,6 +670,10 @@ def land(root):
         try:
             with snapshot.open_snapshot(wt, "tree", "HEAD") as snap:  # begin 时的 HEAD:护栏对着它比
                 exp = nm_config.expanded(nm_config.load_snapshot(snap))
+                # 先暂存、算项目侧净删(这时 worktree 里只有 AI 的改动),再跑 refresh:refresh 重写的生成段不算 AI 的删改
+                _must(wt, "add", "-A")
+                none = {"net": 0, "deleted": [], "shrunk": []}
+                loss = _loss(wt, (nm_map.out_dir(exp) + "/", ".claude/rules/nomess/", "AGENTS.md"))
                 # refresh 会执行 nomess.json 里的 cmd 生成器:worktree 里这个文件被改过(已暂存或未暂存)就不跑,整个丢弃
                 if _run(wt, "diff", "--quiet", "HEAD", "--", nm_config.CONFIG_NAME)[0]:
                     reason = t("DR_FORBID", nm_config.CONFIG_NAME)
@@ -629,24 +685,47 @@ def land(root):
                     changes = _changes(wt)
                     nochange = not changes
                     reason = None if nochange else _vet(snap, wt, exp, changes)
-            if reason is None and not nochange:
+            # 记忆侧先提交(与项目侧成败无关),因为防大删要把两侧的净删加起来判;超线时下面再 revert 它
+            mem = status.memory_location(root)["dir"]
+            mem_c = mem_err = None
+            mem_loss = none
+            mem_skip = bool(mem) and not _mem_own_repo(mem)
+            if mem and not mem_skip:
+                try:
+                    _must(mem, "add", "-A", "--", ".")
+                    mem_loss = _loss(mem, ())
+                    mem_loss["deleted"] = ["memory/" + x for x in mem_loss["deleted"]]
+                    mem_loss["shrunk"] = [("memory/" + x, n) for x, n in mem_loss["shrunk"]]
+                    mem_c = _mem_commit(mem, t("DR_MEM_MSG"))
+                except DreamError as e:
+                    mem_err = _tail(str(e))
+            net_total = mem_loss["net"] + loss["net"]
+            net_over = mem_reverted = False
+            if net_total > NET_DELETE_MAX:  # 不管项目侧为什么已被丢弃都判:记忆侧大删不能因此漏过
+                net_over = True
+                names = t("DR_SEP").join(_gone(loss, mem_loss))
+                reason = reason or t("DR_NET", net_total, NET_DELETE_MAX, names)
+                st["no_net_delete"] = True
+                if mem_c:
+                    try:
+                        _must(mem, "revert", "--no-edit", mem_c, ident=True)
+                        mem_reverted = True
+                    except DreamError as e:
+                        mem_err = _tail(str(e))
+            elif reason is None and not nochange:
                 n = _counts(changes, exp)
                 rc, out, err = _run(wt, "commit", "-q", "-m", t("DR_MSG", *n), ident=True)  # 走 pre-commit 钩子
                 reason = t("DR_COMMIT", _tail(err or out)) if rc else None
                 if reason is None:
                     head, reason = _pick(root, wt, _must(wt, "rev-parse", "HEAD"))
-            mem = status.memory_location(root)["dir"]
-            mem_c = mem_err = None
-            mem_skip = bool(mem) and not _mem_own_repo(mem)
-            if mem and not mem_skip:  # 与项目侧成败无关
-                try:
-                    mem_c = _mem_commit(mem, t("DR_MEM_MSG"))
-                except DreamError as e:
-                    mem_err = _tail(str(e))
             src = os.path.join(wt, NOTES)
             if os.path.isfile(src):
                 with open(src, encoding="utf-8") as f, open(os.path.join(root, NOTES), "a", encoding="utf-8", newline="\n") as g:
                     g.write(f.read().rstrip("\n") + "\n")
+            if net_over:  # 并入 AI 自己的 notes 之后再写,编号才不会撞
+                num = _count_notes(root) + 1
+                with open(os.path.join(root, NOTES), "a", encoding="utf-8", newline="\n") as g:
+                    g.write(t("DR_NET_NOTE", num, net_total, names, num) + "\n")
             notes = _count_notes(root) - lock["notes0"]
         finally:
             try:
@@ -658,7 +737,11 @@ def land(root):
         if ok:
             first = not st["landed_once"]
             args = (n[0], n[1], n[2], unsorted if first else n[3], head[:10], t("DR_SUM_MEM", mem, mem_c[:10]) if mem_c else "")
-            summary = t("DR_SUM_FIRST" if first else "DR_SUM", *args) + (t("DR_SUM_NOTES", notes) if notes > 0 else "")
+            parts = _gone(loss, mem_loss) + [t("DR_SHOW", head[:10])]
+            summary = t("DR_SUM_FIRST" if first else "DR_SUM", *args) + "".join(t("DR_SEP") + x for x in parts) + (t("DR_SUM_NOTES", notes) if notes > 0 else "")
+            st["no_net_delete"] = False
+        elif net_over:  # 超线丢弃:总结要留给用户(下个会话开头会取出)
+            summary = t("DR_DISCARD", reason) + (t("DR_NET_MEM") if mem_reverted else "") + (t("DR_SUM_NOTES", notes) if notes > 0 else "")
         elif mem_c:
             summary = t("DR_SUM_ONLY_MEM", reason or t("DR_NOCHANGE"), mem, mem_c[:10])
         if mem_skip:

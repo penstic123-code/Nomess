@@ -2,6 +2,19 @@
 
 Versions follow [Semantic Versioning](https://semver.org/). Each release has three parts: Added, Changed, Fixed; breaking changes come first, with migration steps.
 
+## 1.1.1 – 2026-11-19
+
+### Changed
+
+- When the docs index at the end of the overview is still too long after collapsing archived plans, each document type with several pages becomes one line linking to a generated index page in that type's folder (`plans/README.md`, `systems/README.md`, …). A hand-written `README.md` there (no `type-index` marker) is left alone and that type is not collapsed.
+- The tidy's one-sentence summary now names the deleted pages and the most-shortened pages (up to 3 each) and ends with `git show --stat <commit>` to see what changed.
+
+### Fixed
+
+- The automatic tidy could quietly drop a lot of text. If one run deletes more than 60 lines net across project docs and the memory folder (archiving, renames and generated files don't count), the project side is discarded, the memory commit is reverted, and a numbered item in `.nomess/dream-notes.md` lets you run it with `/nomess:dream apply N`. The next run is told not to delete net.
+- The tidy no longer fails on a memory folder that has no commits yet.
+- The generated plans index page is no longer checked as a plan (PL-STALE).
+
 ## 1.1.0 – 2026-11-19
 
 ### Breaking changes

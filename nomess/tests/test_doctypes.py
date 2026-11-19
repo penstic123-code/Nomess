@@ -161,6 +161,32 @@ def t_index_deterministic(tmp):
     expect(read(root, "docs/overview.md") == b, "收起后两次生成也应逐字节相同")
 
 
+def t_type_index_fold(tmp):
+    """目录收完归档仍超 -> 有多页的类型收成一行并新建类型索引页;页数少 -> 不建。"""
+    plan = lambda i: ("docs/plans/p%02d.md" % i, "状态: 提案\n\n# 方案 %d\n%s。\n" % (i, "很长的一句话" * 8))
+    root = mkrepo(tmp, "dt_fold", GEN, [("docs/overview.md", INDEX_OVERVIEW), ("docs/systems/core.md", "# core\n核心。\n")] + [plan(i) for i in range(60)])
+    nm(root, "docgen")
+    ov, idx = read(root, "docs/overview.md"), "docs/plans/README.md"
+    expect("- 方案 — 60 份,见 [plans/README.md](plans/README.md)" in ov and "](plans/p00.md)" not in ov, "目录应把方案收成一行: %s" % ov[:400])
+    expect("[core](systems/core.md)" in ov, "只有一页的类型照旧直接链")
+    expect(os.path.isfile(os.path.join(root, idx)) and "<!-- GEN:type-index BEGIN -->" in read(root, idx) and "](p00.md)" in read(root, idx), "应新建带 type-index 段的 plans/README.md")
+    expect(nm(root, "docgen", "--check").returncode == 0, "生成后再查不应过时")
+    small = mkrepo(tmp, "dt_small", GEN, [("docs/overview.md", INDEX_OVERVIEW), plan(0), plan(1)])
+    nm(small, "docgen")
+    expect(not os.path.exists(os.path.join(small, idx)), "页数少不该建类型索引页")
+
+
+def t_type_index_handwritten(tmp):
+    """项目原有的手写 plans/README.md(无 type-index 标记):溢出时 plans 不收成一行、手写内容不被改。"""
+    plan = lambda i: ("docs/plans/p%02d.md" % i, "状态: 提案\n\n# 方案 %d\n%s。\n" % (i, "很长的一句话" * 8))
+    hand = "# 方案说明\n手写的,别动。\n"
+    root = mkrepo(tmp, "dt_hand", GEN, [("docs/overview.md", INDEX_OVERVIEW), ("docs/plans/README.md", hand)] + [plan(i) for i in range(60)])
+    nm(root, "docgen")
+    ov = read(root, "docs/overview.md")
+    expect("见 [plans/README.md]" not in ov and "](plans/p00.md)" in ov, "无标记的 README 不该收类型")
+    expect(read(root, "docs/plans/README.md") == hand, "手写 README 内容不该被改")
+
+
 def t_orphans(tmp):
     root = mkrepo(tmp, "dt4", {}, [("docs/overview.md", "# 总览\n[a](systems/a.md)\n"), ("docs/systems/a.md", "# a\n[b](b.md)\n"),
                                   ("docs/systems/b.md", "# b\n"), ("docs/systems/c.md", "# c\n"), ("docs/systems/d.md", "# d\n"),

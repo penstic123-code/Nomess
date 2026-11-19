@@ -13,7 +13,7 @@ model: sonnet
 
 ## A. Tidy (argument empty or `auto`; both the same)
 
-1. `nomess dream begin`. Exit 3 (another tidy holds the lock): reply with its line and stop. It prints the work list, the worktree, the memory directory (if "not located": tidy the project only) and where notes go.
+1. `nomess dream begin`. Exit 3 (another tidy holds the lock): reply with its line and stop. It prints the work list, the worktree, the memory directory (if "not located": tidy the project only) and where notes go. If the list starts with a line saying this run may not delete a net amount, obey it: only merge, move, archive and rewrite; whatever you delete, add back.
 2. Work through the list with the actions below. Change files only inside that worktree (its path + the repo-relative path) and the memory directory, never in the main checkout. Read only what the list names; verify against the code in the worktree with Read, Grep and `nomess dream git-log <word>`.
 3. `nomess dream land`: it checks the run and lands it on the current branch, or discards the whole run and says why. Reply with exactly the line it prints. Don't fix and retry a discard. To give up midway: `nomess dream abort`.
 
