@@ -8,7 +8,7 @@ description: >-
 
 项目规矩优先：项目的 `AGENTS.md` 或 `CLAUDE.md` 对这里任何一步另有规定（某档走几步、要不要试读、测试、审查），按项目的来。
 
-下文的 `nomess.py` 指 `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`，在项目根执行（`brief-template.md` 和 `merge-steps.md` 也用这个简写）。`size`（`small` / `medium` / `large`）和 `docs_root`（缺省 `docs`，下文写作 `<docs_root>`）取自 `nomess.json`。
+下文的 `nomess.py` 指 `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`，在项目根执行（`brief-template.md` 和 `merge-steps.md` 也用这个简写）。`size`（`small` / `medium` / `large`）和 `docs_root`（缺省 `docs`，下文写作 `<docs_root>`）取自 `nomess.json`。下文的文档位置（`<docs_root>/plans/`、`<docs_root>/schedule.md`、`<docs_root>/ownership-map.md`、`<docs_root>/systems/`）是方案、总排期、归属图、系统说明页这几类的缺省位置；自己列类型的项目（`builtin_doc_types: false`）以 `doc_types` 里带对应 `role` 的条目为准（`AGENTS.md` 里列文档位置的那行也有），没有那个 role 的步骤跳过。
 
 ## 1. 五档
 

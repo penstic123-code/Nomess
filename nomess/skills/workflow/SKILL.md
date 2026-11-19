@@ -8,7 +8,7 @@ description: >-
 
 Project rules win: if the project's `AGENTS.md` or `CLAUDE.md` says otherwise about any step here (tier steps, trial reads, tests, review), follow the project.
 
-Below, `nomess.py` means `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`, run from the project root (`brief-template.md` and `merge-steps.md` use it too). `size` (`small` / `medium` / `large`) and `docs_root` (default `docs`, written `<docs_root>`) come from `nomess.json`.
+Below, `nomess.py` means `${user_config.python} "${CLAUDE_PLUGIN_ROOT}/scripts/nomess.py"`, run from the project root (`brief-template.md` and `merge-steps.md` use it too). `size` (`small` / `medium` / `large`) and `docs_root` (default `docs`, written `<docs_root>`) come from `nomess.json`. The doc places below (`<docs_root>/plans/`, `<docs_root>/schedule.md`, `<docs_root>/ownership-map.md`, `<docs_root>/systems/`) are the defaults of the plans, schedule, ownership and systems doc types; a project with its own type list (`builtin_doc_types: false`) gives each as the `doc_types` entry with that `role` (also in the "Docs go" line of `AGENTS.md`), and a step for a role it has no entry for is skipped.
 
 ## 1. Five tiers
 

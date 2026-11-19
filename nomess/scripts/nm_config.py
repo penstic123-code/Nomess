@@ -148,6 +148,8 @@ DEFAULTS = {
     "public_docs": [],  # 对外文档的 glob,和 doctypes.PUBLIC_DOCS 合起来用(只读:自动整理绝不碰)
     "lessons_remind": 10,  # 自动整理的 inbox 线(入口段不再提醒)
     "doc_types": [],
+    "builtin_doc_types": True,  # 13.15:false = 只认 doc_types 表(条目用 role 沿用内置功能);缺省 true 和 1.1.1 一样
+    "doc_places": "strict",  # 13.15:"free" = DOC4 不报、guard 不挡(实验项目);缺省 strict 和 1.1.1 一样
     "doc_budget": {"*": 0},  # 类型代号或登记的类型名 -> DOC6 的 token 预算(缺省值在 doctypes.BUDGETS)
     "dream": {"auto": False, "stale_days": 30, "max_items": 20},  # auto 缺省关:老项目升级后不该突然自己整理;init 模板显式写 true
 }
@@ -155,7 +157,7 @@ ITEM_KEYS = {
     "check.rules": ("id", "level", "what", "why", "glob", "forbid", "require", "cmd", "timeout"),
     "scopes": ("paths", "why", "checks", "smells", "off"),
     "allow": ("rule", "file", "from", "to", "reason"),
-    "doc_types": ("name", "dir", "what"),
+    "doc_types": ("name", "dir", "file", "what", "role"),
 }
 MAP_BUDGETS = ("index_tokens", "page_tokens")
 INT_SMELLS = ("file_lines", "func_lines", "clone_tokens", "clone_lines", "doc_clone_tokens", "fan_in")
@@ -247,11 +249,19 @@ def _validate(cfg, path):
 
 
 def _doc_types(cfg, path):
-    """dev_docs / public_docs:glob 列表。doc_types:[{name, dir, what}],dir 是 docs_root 下一层目录、不和内置类型(含教训库目录)和彼此重叠,三项都是非空字符串。dream:auto 布尔,其余正整数。"""
+    """dev_docs / public_docs:glob 列表。doc_types:[{name, what, dir 或 file 二选一, role?}],dir 是 docs_root 下一层目录、file 是 docs_root 下一层的 .md,
+    不和内置类型(含教训库目录;file 还不许占内置的单文件位置,老的 dir 条目照 1.1.1 只和目录比)和彼此重叠,都是非空字符串,file 走 repo_path。role(13.15)只在 builtin_doc_types:false 时许写、每个最多一条,
+    overview / schedule / ownership 要 file、systems / plans 要 dir(和内置那类一样,读它的功能才对得上);false 时 overview 必须有。
+    builtin_doc_types 布尔、doc_places strict | free。dream:auto 布尔,其余正整数。"""
     import doctypes
     dt = cfg.get("doc_types", [])
+    full = cfg.get("builtin_doc_types", True)
     if not isinstance(dt, list):
         _bad(path, "doc_types", dt)
+    if not isinstance(full, bool):
+        _bad(path, "builtin_doc_types", full)
+    if cfg.get("doc_places", "strict") not in ("strict", "free"):
+        _bad(path, "doc_places", cfg["doc_places"])
     for key in ("dev_docs", "public_docs"):
         v = cfg.get(key, [])
         if not (isinstance(v, list) and all(isinstance(g, str) and g.strip() for g in v)):
@@ -264,19 +274,28 @@ def _doc_types(cfg, path):
     for key, d in (("docs_root", root), ("lessons_dir", lessons_dir(cfg))):
         if public(d + "/x.md"):
             _bad(path, key, d)
-    taken = doctypes.builtin_dirs(root, lessons_dir(cfg))
-    names = set()
+    taken, bfiles = doctypes.builtin_dirs(root, lessons_dir(cfg), full), doctypes.builtin_files(root, full)
+    names, roles = set(), set()
     for n, x in enumerate(dt):
         w = "doc_types[%d]" % n
-        if not (isinstance(x, dict) and all(isinstance(x.get(k), str) and x[k].strip() for k in ("name", "dir", "what"))):
+        if not (isinstance(x, dict) and all(isinstance(x.get(k), str) and x[k].strip() for k in ("name", "what")) and ("dir" in x) != ("file" in x)):
             _bad(path, w, x)
-        x["dir"] = d = posixpath.normpath(x["dir"].strip().replace("\\", "/"))
-        if posixpath.dirname(d) != root or re.search(r"\s", d) or d in taken or x["name"] in names:
+        key = "dir" if "dir" in x else "file"
+        role = x.get("role")
+        if not isinstance(x[key], str) or "role" in x and (full or role not in doctypes.ROLES or role in roles
+                                                                or (doctypes.role_path({}, role).endswith(".md")) != (key == "file")):
+            _bad(path, w, x)
+        x[key] = d = repo_path(x[key].strip(), path, w) if key == "file" else posixpath.normpath(x[key].strip().replace("\\", "/"))
+        if posixpath.dirname(d) != root or re.search(r"\s", d) or d in taken or x["name"] in names \
+                or key == "file" and (not d.endswith(".md") or d in bfiles) or role == "overview" and public(d):  # 总览要写目录段,不能是只读的对外文档
             _bad(path, w, x)
         taken.add(d)
         names.add(x["name"])
+        roles.add(role)
+    if not full and "overview" not in roles:  # 目录页 docs-index 和 DOC5 都从总览出发,没它整套文档就没有入口
+        _bad(path, "doc_types", dt)
     db = cfg.get("doc_budget", {})
-    legal = set(doctypes.BUDGETS) | names
+    legal = (set(doctypes.BUDGETS) if full else set()) | names
     if not isinstance(db, dict) or not all(k in legal and _num(v, True) for k, v in db.items()):
         _bad(path, "doc_budget", db)
     dr = cfg.get("dream", {})
@@ -439,7 +458,8 @@ def unknown_keys(cfg):
 
 # B2:两份展开后的配置逐键比,表里没有的键不比(size 的效果已在 check.builtin、review.level 里)。
 # 判法:superset 只许增;superset_ordered 只许增且已有条目相对顺序不变;by_id 按 id 删或改(level 黄改红除外)都算;
-# same 任何改动;le 变大;le_map 按键变大或去掉;ge 档变低;scopes / tables 见各自函数。
+# same 任何改动;le 变大;le_map 按键变大或去掉;ge 档变低;from_default 两档的键离开缺省值(缺省就是严的那档);
+# places 按 doc_types 条目的位置(dir | file, 路径)比,旧的没了就算;旧 role 没了或挪到别处也算,给已有位置加 role 不算;scopes / tables 见各自函数。
 LOOSEN = [
     ("check.builtin", "superset"),
     ("check.rules", "by_id"),
@@ -463,6 +483,9 @@ LOOSEN = [
     ("public_docs", "superset"),  # 变窄 = 有文件从“只读”变成可被自动整理改动
     ("dev_docs", "superset"),  # 变窄 = 有文件从“只许就地改”变成可被挪、删
     ("docs_root", "same"),  # 换根 = 旧位置不再受 DOC4 等管
+    ("doc_places", "from_default"),  # strict -> free:DOC4 和 guard 不再管位置
+    ("builtin_doc_types", "from_default"),  # true -> false:内置类型的位置不再受管
+    ("doc_types", "places"),  # 删条目、改目录 / 文件、挪 role:旧位置不再受管;改名字和说明不算
     # >>> P22 只在这两行之间追加
     # <<< P22
     # >>> P23 只在这两行之间追加
@@ -564,6 +587,12 @@ def loosened(old, new):
             diff = ["%s: %s -> %s" % (k, v, (y or {}).get(k)) for k, v in sorted((x or {}).items()) if (y or {}).get(k, float("inf")) > v]
         elif how == "ge":
             diff = ["%s -> %s" % (x, y)] if REVIEW_LEVELS.index(y) < REVIEW_LEVELS.index(x) else []
+        elif how == "from_default":
+            diff = ["%s -> %s" % (_sig(x), _sig(y))] if x == DEFAULTS[path] != y else []
+        elif how == "places":
+            loc = lambda v: ("dir", v["dir"]) if "dir" in v else ("file", v["file"])  # noqa: E731
+            ys, yr = {loc(v) for v in y or []}, {v["role"]: loc(v) for v in y or [] if v.get("role")}
+            diff = [v["name"] for v in x or [] if loc(v) not in ys or v.get("role") and yr.get(v["role"]) != loc(v)]
         elif how == "scopes":
             diff = _scopes(x or [], y or [])
         else:

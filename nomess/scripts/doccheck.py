@@ -20,11 +20,15 @@ def _lines(snap, rel):
 
 
 def system_pages(snap, cfg):
+    import doctypes
+    sysdir = doctypes.role_path(cfg, "systems")
+    if not sysdir:  # 13.15:没有 systems 那一类,说明页检查静默不跑
+        return []
     names = list(cfg.get("systems", {}))
-    names += [posixpath.splitext(posixpath.basename(p))[0] for p in snap.ls(nm_config.docs_root(cfg) + "/systems", ".md")]
+    names += [posixpath.splitext(posixpath.basename(p))[0] for p in snap.ls(sysdir, ".md")]
     out = []
     for name in dict.fromkeys(names):
-        rel = "%s/systems/%s.md" % (nm_config.docs_root(cfg), name)
+        rel = "%s/%s.md" % (sysdir, name)
         if not snap.isfile(rel):
             continue  # 说明页按需建,没有不报
         head = [l for l in _lines(snap, rel) if l.strip()][:12]
@@ -93,8 +97,10 @@ def plan_head(text):
 
 
 def plans(snap, cfg):
-    """方案文件:<docs_root>/plans/ 下(含 archive/)的 .md。"""
-    return snap.ls(nm_config.docs_root(cfg) + "/plans", ".md", True)
+    """方案文件:plans 目录(缺省 <docs_root>/plans/)下(含 archive/)的 .md;没有 plans 那一类就是空。"""
+    import doctypes
+    d = doctypes.role_path(cfg, "plans")
+    return snap.ls(d, ".md", True) if d else []
 
 
 def plan_links(snap, cfg):
@@ -109,8 +115,9 @@ def plan_links(snap, cfg):
 
 def plan_status(snap, cfg):
     """PLN2(黄):归档方案缺状态;写了“被取代”而状态不是“已被取代”。"""
+    import doctypes
     out = []
-    archive = nm_config.docs_root(cfg) + "/plans/archive/"
+    archive = "%s/archive/" % doctypes.role_path(cfg, "plans")  # 没有 plans 那一类时 plans() 为空,用不到它
     for rel in plans(snap, cfg):
         h = plan_head(snap.text(rel))
         if rel.startswith(archive) and not h.get("status"):

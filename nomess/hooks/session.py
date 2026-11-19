@@ -13,7 +13,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.normpath(os.path.join(HERE, "..", "scripts"))
 OFF_VALUES = ("false", "0", "no", "off")
 
-ENABLE = ('nomess is not enabled in this repo. Before you first change any file, run `"{py}" "{nomess}" init --auto --lang <en|zh-CN: the language the user writes in>`, '
+# 13.15:启用前先用一句话问文档怎么管,按回答带 --docs;用户不在意就 standard。已启用的项目走不到这里,不会再问。
+ENABLE = ('nomess is not enabled in this repo. Before you first change any file, ask the user in one sentence how docs should be managed: '
+          'the standard 7 types (standard), no fixed places, good for experiments (free), or their own list of types (custom); '
+          'then run `"{py}" "{nomess}" init --auto --lang <en|zh-CN: the language the user writes in> --docs <standard|free|custom; standard if they do not care>`, '
           'then tell the user in one sentence that nomess is enabled (to undo: `"{py}" "{nomess}" off`). Questions and read-only work do not count.')
 DREAM = "Invoke the nomess:dream skill with argument `auto`; don't wait for it; when it returns, relay its one-line summary to the user."
 

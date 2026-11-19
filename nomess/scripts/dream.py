@@ -238,7 +238,7 @@ def scan(root, snap, cfg, exp, st):
     items["memory"] = ["%s %s: %s" % (f["rule"], f["file"], f["msg"]) for f in over]
     if over:
         hot.add("memory")
-    bad = doctypes.misplaced(snap, exp)
+    bad = doctypes.misplaced(snap, exp) if exp["doc_places"] == "strict" else []  # free(13.15)不管位置,整理也不去挪散放的页
     items["doc4"] = bad
     if len(bad) >= 5:
         hot.add("doc4")

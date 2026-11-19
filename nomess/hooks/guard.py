@@ -60,7 +60,7 @@ def _safe_word(w):
 
 
 def _whitelisted(args):
-    """nomess.py 后面的参数是不是白名单里的调用:dream begin|land|abort|git-log <词>|mv <a> <b>|rm <a>、init --auto [--lang X] [--size X]、
+    """nomess.py 后面的参数是不是白名单里的调用:dream begin|land|abort|git-log <词>|mv <a> <b>|rm <a>、init --auto [--lang X] [--size X] [--docs standard|free|custom]、
     lessons find|add|status、status、check(不带 --freeze,含它的缩写)、doctor。"""
     if not args:
         return False
@@ -70,10 +70,12 @@ def _whitelisted(args):
     if sub == "init":
         opts, i = set(), 0
         while i < len(rest):
-            name, eq, _ = rest[i].partition("=")
+            name, eq, val = rest[i].partition("=")
             if name == "--auto" and not eq:
                 i += 1
             elif name in ("--lang", "--size") and name not in opts:
+                i += 1 if eq else 2
+            elif name == "--docs" and name not in opts and (val if eq else (rest[i + 1:] or [""])[0]) in ("standard", "free", "custom"):
                 i += 1 if eq else 2
             else:
                 return False

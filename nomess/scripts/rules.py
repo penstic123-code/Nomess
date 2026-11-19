@@ -54,7 +54,9 @@ def entries(snap, cfg):
     for p in snap.ls(ldir, ".md"):
         if posixpath.basename(p) != lessons.INBOX:
             out += [(p, e) for e in lessons.parse_text(snap.text(p), posixpath.basename(p))]
-    for p in snap.ls(nm_config.docs_root(cfg) + "/systems", ".md"):
+    import doctypes
+    sysdir = doctypes.role_path(cfg, "systems")
+    for p in snap.ls(sysdir, ".md") if sysdir else []:  # 13.15:没有 systems 那一类就只读教训库
         out += [(p, e) for e in pitfalls(snap.text(p), posixpath.basename(p))]
     return out
 

@@ -223,6 +223,114 @@ def t_review_must(tmp):
     expect("L6" in out and "已核实" in out, "外部条目改成已核实应进必审: %s" % out[:400])
 
 
+# ---------------------------------------------------------------- 13.15 文档类型由项目自己定
+
+OV_ONLY = [{"name": "首页", "file": "docs/overview.md", "what": "入口", "role": "overview"},
+           {"name": "笔记", "dir": "docs/notes", "what": "随手记"}]
+
+
+def t_custom_missing_roles_silent(tmp):
+    """builtin_doc_types:false、只有 overview 一个 role:DOC3、DOC7、排期对账、方案检查都静默不跑,不报错;
+    内置位置 docs/systems/ 不再是类型位置,登记的 docs/notes/ 是。"""
+    root = mkrepo(tmp, "dtc1", {"size": "large", "builtin_doc_types": False, "doc_types": OV_ONLY,
+                                "systems": {"core": ["src/core/**"]}},
+                  [("docs/overview.md", "# 首页\n\n[笔记](notes/a.md)\n"), ("docs/notes/a.md", "# a\n"), ("src/core/a.py", "x = 1\n")])
+    base = commit(root)
+    put(root, "src/core/a.py", "x = 2\n")
+    put(root, "docs/systems/core.md", "# core\n")
+    commit(root)
+    p = nm(root, "check", "--ci", "--base", base, "--json")
+    expect("Traceback" not in p.stderr, "缺 role 的功能应静默跳过而不是出错: %r" % p.stderr)
+    f = json.loads(p.stdout)
+    expect(not [i for i in f if i["rule"] in ("DOC3", "DOC7", "C4", "PL-STALE", "PLN1", "PLN2")], "缺 role 的功能不该报: %r" % f)
+    expect([i["file"] for i in f if i["rule"] == "DOC4"] == ["docs/systems/core.md"], "只认表里的位置: %r" % f)
+    expect(nm(root, "map").returncode == 0, "没有 systems 那一类,系统图照常生成")
+
+
+def t_free_no_block_no_doc4(tmp):
+    """doc_places free:新增散放的页 DOC4 不报,guard 不挡;入口段不说“会被挡”。"""
+    import doctypes
+    import nm_config
+    import snapshot
+    root = mkrepo(tmp, "dtfree", {"doc_places": "free"}, [("docs/systems/core.md", "# core\n")])
+    base = commit(root)
+    put(root, "docs/notes/new.md", "# 新\n")
+    commit(root)
+    p, f = doc4(root, base)
+    expect(not f, "free 下新增散放页不报 DOC4: %r" % f)
+    with snapshot.open_snapshot(root, "tree", "HEAD") as snap:
+        exp = nm_config.expanded(nm_config.load_snapshot(snap))
+        expect(doctypes.blocked("docs/other/x.md", exp, snap) is None, "free 下 guard 不挡")
+    expect("挡" not in doctypes.where_lines(exp)[0], "free 下入口段不说会被挡: %r" % doctypes.where_lines(exp))
+
+
+def t_custom_init_same_doc4(tmp):
+    """init --auto --docs custom 写出的配置能加载,DOC4 结果(哪些页、什么颜色)和 standard 相同;只有 docs/README.md 时它就是总览。"""
+    import doctypes
+    import nm_config
+    import snapshot
+    files = [("src/a.py", "x = 1\n"), ("docs/systems/a.md", "# a\n"), ("docs/plans/p.md", "# p\n"), ("docs/plans/archive/old.md", "# o\n"),
+             ("docs/schedule.md", "# s\n"), ("docs/ownership-map.md", "# o\n"), ("docs/stray/x.md", "# x\n"), ("docs/a/b/c.md", "# c\n"),
+             ("docs/README.md", "# r\n")]
+    got = {}
+    for mode in ("standard", "custom"):
+        root = os.path.join(tmp, "dtinit-" + mode)
+        os.makedirs(root)
+        git(root, "init", "-q")
+        for rel, text in files:
+            put(root, rel, text)
+        p = nm(root, "init", "--auto", "--lang", "zh-CN", "--docs", mode)
+        expect(p.returncode == 0, "init --docs %s 应成功: %r" % (mode, p.stderr))
+        commit(root)
+        with snapshot.open_snapshot(root, "tree", "HEAD") as snap:
+            exp = nm_config.expanded(nm_config.load_snapshot(snap))
+            got[mode] = sorted((i["file"], i["level"]) for i in doctypes.doc4(snap, {}, exp))
+        if mode == "custom":
+            expect(exp["builtin_doc_types"] is False and len(exp["doc_types"]) == 5, "custom 应展开 5 个带 role 的条目: %r" % exp["doc_types"])
+            expect(doctypes.overview(exp) == "docs/README.md", "只有 README.md 时 custom 的总览应是它: %r" % doctypes.overview(exp))
+    expect(got["standard"] == got["custom"] and got["custom"], "custom 和 standard 的 DOC4 应相同: %r" % got)
+
+
+def t_loosen_doc_keys(tmp):
+    """B2 认三种放宽:doc_places strict->free、builtin_doc_types true->false、doc_types 删条目或改目录;反方向和只改名字说明不算。"""
+    import nm_config
+    base = {"format": "nomess/1", "main_branch": "main"}
+    api = {"name": "api", "dir": "docs/api", "what": "接口"}
+    loose = lambda a, b: [k for k, _ in nm_config.loosened(nm_config.expanded(dict(base, **a)), nm_config.expanded(dict(base, **b)))]  # noqa: E731
+    expect(loose({}, {"doc_places": "free"}) == ["doc_places"] and not loose({"doc_places": "free"}, {}), "strict->free 算放宽,反过来不算")
+    expect(loose({}, {"builtin_doc_types": False, "doc_types": OV_ONLY}) == ["builtin_doc_types"], "true->false 算放宽")
+    expect("builtin_doc_types" not in loose({"builtin_doc_types": False, "doc_types": OV_ONLY}, {}), "false->true 不算放宽")
+    expect(loose({"doc_types": [api]}, {}) == ["doc_types"], "删条目算放宽")
+    expect(loose({"doc_types": [api]}, {"doc_types": [dict(api, dir="docs/ref")]}) == ["doc_types"], "改目录算放宽")
+    expect(not loose({"doc_types": [api]}, {"doc_types": [dict(api, name="接口", what="对外接口")]}), "只改名字和说明不算放宽")
+    ov, notes = OV_ONLY
+    mine = lambda *x: {"builtin_doc_types": False, "doc_types": list(x)}  # noqa: E731
+    expect(not loose(mine(ov, notes), mine(ov, dict(notes, role="plans"))), "给已有位置加 role 不算放宽")
+    expect(loose(mine(ov, dict(notes, role="plans")), mine(ov, notes, {"name": "p", "dir": "docs/p", "what": "p", "role": "plans"})) == ["doc_types"],
+           "role 挪到别的位置算放宽")
+    old = {"name": "x", "dir": "docs/x.md", "what": "x"}
+    expect(loose({"doc_types": [old]}, {"doc_types": [{"name": "x", "file": "docs/x.md", "what": "x"}]}) == ["doc_types"], "dir 改成同路径的 file 算放宽")
+
+
+def t_doc_types_validation(tmp):
+    """1.1.1 能加载的老写法 {dir: docs/schedule.md} 照旧能加载;新写法 file 不许占内置文件、不许带 NUL;builtin true 时 role: null 也不许;总览不许是对外文档。"""
+    import nm_config
+    base = {"format": "nomess/1", "main_branch": "main"}
+
+    def bad(**c):
+        try:
+            nm_config.parse(json.dumps(dict(base, **c)), "nomess.json")
+        except ValueError:
+            return True
+        return False
+    expect(not bad(doc_types=[{"name": "s", "dir": "docs/schedule.md", "what": "s"}]), "老写法 dir 指向内置文件名照旧能加载")
+    expect(bad(doc_types=[{"name": "s", "file": "docs/schedule.md", "what": "s"}]), "file 不许占内置文件")
+    expect(bad(doc_types=[{"name": "s", "file": "docs/a\u0000.md", "what": "s"}]), "file 带 NUL 应报错")
+    expect(bad(doc_types=[{"name": "s", "dir": "docs/s", "what": "s", "role": None}]), "builtin true 时 role: null 也不许")
+    expect(bad(builtin_doc_types=False, public_docs=["docs/home.md"], doc_types=[{"name": "h", "file": "docs/home.md", "what": "h", "role": "overview"}]),
+           "总览不许是对外文档")
+
+
 def main():
     tmp = tempfile.mkdtemp()
     try:
