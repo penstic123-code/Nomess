@@ -2,6 +2,12 @@
 
 Versions follow [Semantic Versioning](https://semver.org/). Each release has three parts: Added, Changed, Fixed; breaking changes come first, with migration steps.
 
+## 1.2.1 – 2026-11-19
+
+### Changed
+
+- `init --auto --docs custom` now ends by having the AI propose document types that fit the project (from its README, top-level folders and existing docs), show them to the user, and write them into `doc_types` once the user agrees. The expanded built-in types are only the starting point.
+
 ## 1.2.0 – 2026-11-19
 
 ### Added

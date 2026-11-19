@@ -26,6 +26,13 @@ M = {
     "IA_DONE": ("nomess enabled. Changed: %s. Froze %d existing findings in the baseline. %s Tell the user in one sentence; not committed.",
                 "nomess 已启用。改动的文件:%s。存量冻结了 %d 条。%s 用一句话告诉用户;没有提交。"),
     "IA_NONE": ("nothing", "无"),
+    "IA_CUSTOM": ("Next, before other work: propose document types that fit this project. Look at its README, top-level folders and existing docs, then show the user "
+                  "in one message 3-7 types, each a name, one line on what goes there, and a place (a folder or one .md file directly under %s). Keep the `overview` entry "
+                  "(a file; the docs index lives there; to use another file, rename the existing one to it first); keep `role` on the built-in entries whose job the project wants (systems, schedule, plans, ownership), drop the rest. "
+                  "The lessons library and the system map always exist: don't list them. Once the user agrees or edits, replace `doc_types` in nomess.json and rerun the same init command.",
+                  "接下来先别做别的:给这个项目提一套合适的文档类型。看它的 README、顶层目录和已有文档,在一条消息里给用户列 3-7 类,每类写名字、一句话放什么、位置"
+                  "(%s 下一层的目录或单个 .md)。`overview` 那条要留(单个文件,目录段挂在上面;要换文件就先把现有的改名过去);内置条目里项目用得上的功能(systems、schedule、plans、ownership)留着 `role`,"
+                  "用不上的删掉。教训库和系统图一直都在,不用列。用户同意或改完后,替换 nomess.json 的 `doc_types`,再跑一次同样的 init 命令。"),
     "IA_WIRED": ("Commit checks are wired.", "提交检查已接上。"),
     "IA_NOT_WIRED": ("Commit checks are NOT wired (another hook manager owns the hooks): run `nomess hooks install` for the recipe.",
                      "提交检查没接上(已有别的钩子管理器):跑 `nomess hooks install` 看接线配方。"),
@@ -116,7 +123,7 @@ def main(argv):
     root = snapshot.toplevel(os.getcwd())  # 不在 git 仓库抛 SnapshotError,入口转成退出 2
     os.chdir(root)
     cfg_path = os.path.join(root, nm_config.CONFIG_NAME)
-    touched = []
+    touched, propose = [], False
     if os.path.isfile(cfg_path):
         cfg = nm_config.load(cfg_path)  # 同时设好提示语言
         lang = cfg.get("lang", "en")
@@ -153,6 +160,7 @@ def main(argv):
             if not os.path.isfile(at["overview"]) and os.path.isfile(readme):
                 at["overview"] = readme
             new["builtin_doc_types"] = False
+            propose = True  # 展开的只是起点:让 AI 照项目提一套,用户点头再写(1.2.1)
             new["doc_types"] = [{"name": t("DT_" + r), "what": t("DT_WHAT_" + r), ("file" if p.endswith(".md") else "dir"): p, "role": r}
                                 for r, p in at.items()]
         new["docgen"]["docs-index"]["file"] = doctypes.role_path(new, "overview")  # 模板按缺省根写的 docs/overview.md,换了根要跟着换
@@ -196,6 +204,8 @@ def main(argv):
     wired = all(res in ("installed", "kept") for _, res in githook.install(root))
     _git(root, "config", "--local", "--unset", "nomess.auto")
     print(t("IA_DONE", ", ".join(touched) or t("IA_NONE"), n, t("IA_WIRED") if wired else t("IA_NOT_WIRED")))
+    if propose:
+        print(t("IA_CUSTOM", docs))
     return 0
 
 
