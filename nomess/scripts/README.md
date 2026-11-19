@@ -82,7 +82,7 @@
 
   中英混用的库也能读:两种写法解析出同一个结果(状态在内部归成 `verified` / `unverified`)。
 - **nomess doctor** [`--python 名字`]:零 token 自检,每项一行 `ok|warn|FAIL  说明`,FAIL 带一句 `Fix:` 修法;有 FAIL 退出码 1。查 Claude Code 版本(要求 2.1.277 及以上:取直接执行的 hook、`userConfig` 的 `options`〔2.1.271〕、直接读 `AGENTS.md`〔2.1.277〕里最高的;`claude` 不在 PATH 上只提示)、运行脚本的 Python、钩子用的解释器(读 `~/.claude/settings.json` 的 `pluginConfigs`,或 `--python` 指定;选错或没装报 FAIL)、git、`nomess.json` 能不能读、提交前钩子能不能跑、`CLAUDE.md` 有没有导入 `AGENTS.md`。
-- **Claude Code 钩子**(`hooks/`):`session.py`(SessionStart,零 token;没事不输出,有事打一行英文:没启用时让 AI 第一次改文件前先用一句话问用户文档怎么管(标准 / 不管位置 / 自己列类型),再带 `--docs` 跑 `init --auto`;上次整理的总结没告诉用户时让 AI 转告;`dream.due()` 为真时让 AI 后台调 `nomess:dream`;不在 git 仓库、设了 `CI`、`nomess.auto=false`、`userConfig.auto_init` 关时都不出声)。`guard.py`(PreToolUse):挡绕过提交闸门、挡 Write 新建不在类型位置的文档;另对三类调用回 allow 免弹窗:本插件 `nomess.py` 的白名单子命令(`dream`、`init --auto`、`lessons find|add|status`、`status`、`check`(不带 `--freeze`)、`doctor`)、整理 worktree 里 `dream.writable` 认可的文件、子代理写项目记忆目录里的 `.md`。
+- **Claude Code 钩子**(`hooks/`):`session.py`(SessionStart,零 token;没事不输出,有事打一行英文:没启用时让 AI 第一次改文件前先用一句话问用户文档怎么管(标准 / 不管位置 / 按项目定类型:custom 时 init 输出让 AI 照项目提一套、用户点头再写),再带 `--docs` 跑 `init --auto`;上次整理的总结没告诉用户时让 AI 转告;`dream.due()` 为真时让 AI 后台调 `nomess:dream`;不在 git 仓库、设了 `CI`、`nomess.auto=false`、`userConfig.auto_init` 关时都不出声)。`guard.py`(PreToolUse):挡绕过提交闸门、挡 Write 新建不在类型位置的文档;另对三类调用回 allow 免弹窗:本插件 `nomess.py` 的白名单子命令(`dream`、`init --auto`、`lessons find|add|status`、`status`、`check`(不带 `--freeze`)、`doctor`)、整理 worktree 里 `dream.writable` 认可的文件、子代理写项目记忆目录里的 `.md`。
 - **CI**:仓库根 `.github/workflows/test.yml`,Windows / macOS / Ubuntu × Python 3.9 和最新版,跑 `tests/run.py` 和 `tests/test_hooks.py`。
 
 ## 检测器和模块(P21 定的接口;后四包只往里加,不改含义)

@@ -135,7 +135,7 @@ The system map and docs are for the AI to **look up when needed**; they aren't p
 
 Every project doc has a fixed place: the overview, one page per system, plans, the schedule, the lessons library. When the AI tries to create a doc anywhere else it is stopped on the spot and told where it belongs; the overview ends with a generated index of every doc; pages that grow too long are split into a summary page and sub-pages; docs describe how things are now, and old wording is replaced rather than appended to.
 
-The types are the project's choice. When Nomess is first enabled the AI asks one question: the standard types, no fixed places (good for experiments: nothing is blocked, stray pages are only listed as unsorted), or your own list of types in `nomess.json`, where each type can keep a built-in job such as "system pages" or "plans".
+The types are the project's choice. When Nomess is first enabled the AI asks one question: the standard types, no fixed places (good for experiments: nothing is blocked, stray pages are only listed as unsorted), or types made for this project (the AI looks at the project and proposes them, you confirm, and they go into `nomess.json` for later edits), where each type can keep a built-in job such as "system pages" or "plans".
 
 Not every doc is Nomess's to manage. Docs fall into three tiers by who reads them:
 
